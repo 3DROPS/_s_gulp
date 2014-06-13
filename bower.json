@@ -1,0 +1,8 @@
+{
+  "name": "_s_gulp",
+  "private": true,
+  "dependencies": {
+    "modernizr": "~2.8.1",
+    "jquery": "~1.11.0"
+  }
+}
