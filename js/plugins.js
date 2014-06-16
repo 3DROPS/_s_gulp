@@ -1,2498 +1,1406 @@
-/**
- * Isotope v1.5.26
- * An exquisite jQuery plugin for magical layouts
- * http://isotope.metafizzy.co
+/*!
+ * Modernizr v2.8.2
+ * www.modernizr.com
  *
- * Commercial use requires one-time purchase of a commercial license
- * http://isotope.metafizzy.co/docs/license.html
- *
- * Non-commercial use is licensed under the MIT License
- *
- * Copyright 2014 Metafizzy
+ * Copyright (c) Faruk Ates, Paul Irish, Alex Sexton
+ * Available under the BSD and MIT licenses: www.modernizr.com/license/
  */
 
-/*jshint asi: true, browser: true, curly: true, eqeqeq: true, forin: false, immed: false, newcap: true, noempty: true, strict: true, undef: true */
-/*global jQuery: false */
+/*
+ * Modernizr tests which native CSS3 and HTML5 features are available in
+ * the current UA and makes the results available to you in two ways:
+ * as properties on a global Modernizr object, and as classes on the
+ * <html> element. This information allows you to progressively enhance
+ * your pages with a granular level of control over the experience.
+ *
+ * Modernizr has an optional (not included) conditional resource loader
+ * called Modernizr.load(), based on Yepnope.js (yepnopejs.com).
+ * To get a build that includes Modernizr.load(), as well as choosing
+ * which tests to include, go to www.modernizr.com/download/
+ *
+ * Authors        Faruk Ates, Paul Irish, Alex Sexton
+ * Contributors   Ryan Seddon, Ben Alman
+ */
 
-(function( window, $, undefined ){
+window.Modernizr = (function( window, document, undefined ) {
 
-  'use strict';
+    var version = '2.8.2',
 
-  // get global vars
-  var document = window.document;
-  var docElem = document.documentElement;
-  var Modernizr = window.Modernizr;
+    Modernizr = {},
 
-  // helper function
-  var capitalize = function( str ) {
-    return str.charAt(0).toUpperCase() + str.slice(1);
-  };
+    /*>>cssclasses*/
+    // option for enabling the HTML classes to be added
+    enableClasses = true,
+    /*>>cssclasses*/
 
-  // ========================= getStyleProperty by kangax ===============================
-  // http://perfectionkills.com/feature-testing-css-properties/
+    docElement = document.documentElement,
 
-  var prefixes = 'Moz Webkit O Ms'.split(' ');
+    /**
+     * Create our "modernizr" element that we do most feature tests on.
+     */
+    mod = 'modernizr',
+    modElem = document.createElement(mod),
+    mStyle = modElem.style,
 
-  var getStyleProperty = function( propName ) {
-    var style = docElem.style,
-        prefixed;
+    /**
+     * Create the input element for various Web Forms feature tests.
+     */
+    inputElem /*>>inputelem*/ = document.createElement('input') /*>>inputelem*/ ,
 
-    // test standard property first
-    if ( typeof style[propName] === 'string' ) {
-      return propName;
-    }
+    /*>>smile*/
+    smile = ':)',
+    /*>>smile*/
 
-    // capitalize
-    propName = capitalize( propName );
+    toString = {}.toString,
 
-    // test vendor specific properties
-    for ( var i=0, len = prefixes.length; i < len; i++ ) {
-      prefixed = prefixes[i] + propName;
-      if ( typeof style[ prefixed ] === 'string' ) {
-        return prefixed;
+    // TODO :: make the prefixes more granular
+    /*>>prefixes*/
+    // List of property values to set for css tests. See ticket #21
+    prefixes = ' -webkit- -moz- -o- -ms- '.split(' '),
+    /*>>prefixes*/
+
+    /*>>domprefixes*/
+    // Following spec is to expose vendor-specific style properties as:
+    //   elem.style.WebkitBorderRadius
+    // and the following would be incorrect:
+    //   elem.style.webkitBorderRadius
+
+    // Webkit ghosts their properties in lowercase but Opera & Moz do not.
+    // Microsoft uses a lowercase `ms` instead of the correct `Ms` in IE8+
+    //   erik.eae.net/archives/2008/03/10/21.48.10/
+
+    // More here: github.com/Modernizr/Modernizr/issues/issue/21
+    omPrefixes = 'Webkit Moz O ms',
+
+    cssomPrefixes = omPrefixes.split(' '),
+
+    domPrefixes = omPrefixes.toLowerCase().split(' '),
+    /*>>domprefixes*/
+
+    /*>>ns*/
+    ns = {'svg': 'http://www.w3.org/2000/svg'},
+    /*>>ns*/
+
+    tests = {},
+    inputs = {},
+    attrs = {},
+
+    classes = [],
+
+    slice = classes.slice,
+
+    featureName, // used in testing loop
+
+
+    /*>>teststyles*/
+    // Inject element with style element and some CSS rules
+    injectElementWithStyles = function( rule, callback, nodes, testnames ) {
+
+      var style, ret, node, docOverflow,
+          div = document.createElement('div'),
+          // After page load injecting a fake body doesn't work so check if body exists
+          body = document.body,
+          // IE6 and 7 won't return offsetWidth or offsetHeight unless it's in the body element, so we fake it.
+          fakeBody = body || document.createElement('body');
+
+      if ( parseInt(nodes, 10) ) {
+          // In order not to give false positives we create a node for each test
+          // This also allows the method to scale for unspecified uses
+          while ( nodes-- ) {
+              node = document.createElement('div');
+              node.id = testnames ? testnames[nodes] : mod + (nodes + 1);
+              div.appendChild(node);
+          }
       }
-    }
-  };
 
-  var transformProp = getStyleProperty('transform'),
-      transitionProp = getStyleProperty('transitionProperty');
+      // <style> elements in IE6-9 are considered 'NoScope' elements and therefore will be removed
+      // when injected with innerHTML. To get around this you need to prepend the 'NoScope' element
+      // with a 'scoped' element, in our case the soft-hyphen entity as it won't mess with our measurements.
+      // msdn.microsoft.com/en-us/library/ms533897%28VS.85%29.aspx
+      // Documents served as xml will throw if using &shy; so use xml friendly encoded version. See issue #277
+      style = ['&#173;','<style id="s', mod, '">', rule, '</style>'].join('');
+      div.id = mod;
+      // IE6 will false positive on some tests due to the style element inside the test div somehow interfering offsetHeight, so insert it into body or fakebody.
+      // Opera will act all quirky when injecting elements in documentElement when page is served as xml, needs fakebody too. #270
+      (body ? div : fakeBody).innerHTML += style;
+      fakeBody.appendChild(div);
+      if ( !body ) {
+          //avoid crashing IE8, if background image is used
+          fakeBody.style.background = '';
+          //Safari 5.13/5.1.4 OSX stops loading if ::-webkit-scrollbar is used and scrollbars are visible
+          fakeBody.style.overflow = 'hidden';
+          docOverflow = docElement.style.overflow;
+          docElement.style.overflow = 'hidden';
+          docElement.appendChild(fakeBody);
+      }
 
+      ret = callback(div, rule);
+      // If this is done after page load we don't want to remove the body so check if body exists
+      if ( !body ) {
+          fakeBody.parentNode.removeChild(fakeBody);
+          docElement.style.overflow = docOverflow;
+      } else {
+          div.parentNode.removeChild(div);
+      }
 
-  // ========================= miniModernizr ===============================
-  // <3<3<3 and thanks to Faruk and Paul for doing the heavy lifting
+      return !!ret;
 
-  /*!
-   * Modernizr v1.6ish: miniModernizr for Isotope
-   * http://www.modernizr.com
-   *
-   * Developed by:
-   * - Faruk Ates  http://farukat.es/
-   * - Paul Irish  http://paulirish.com/
-   *
-   * Copyright (c) 2009-2010
-   * Dual-licensed under the BSD or MIT licenses.
-   * http://www.modernizr.com/license/
-   */
-
-  /*
-   * This version whittles down the script just to check support for
-   * CSS transitions, transforms, and 3D transforms.
-  */
-
-  var tests = {
-    csstransforms: function() {
-      return !!transformProp;
     },
+    /*>>teststyles*/
 
-    csstransforms3d: function() {
-      var test = !!getStyleProperty('perspective');
-      // double check for Chrome's false positive
-      if ( test && 'webkitPerspective' in docElem.style ) {
-        var $style = $('<style>@media (transform-3d),(-webkit-transform-3d)' +
-              '{#modernizr{height:3px}}</style>').appendTo('head'),
-            $div = $('<div id="modernizr" />').appendTo('html');
+    /*>>mq*/
+    // adapted from matchMedia polyfill
+    // by Scott Jehl and Paul Irish
+    // gist.github.com/786768
+    testMediaQuery = function( mq ) {
 
-        test = $div.height() === 3;
-
-        $div.remove();
-        $style.remove();
-      }
-      return test;
-    },
-
-    csstransitions: function() {
-      return !!transitionProp;
-    }
-  };
-
-  var testName;
-
-  if ( Modernizr ) {
-    // if there's a previous Modernzir, check if there are necessary tests
-    for ( testName in tests) {
-      if ( !Modernizr.hasOwnProperty( testName ) ) {
-        // if test hasn't been run, use addTest to run it
-        Modernizr.addTest( testName, tests[ testName ] );
-      }
-    }
-  } else {
-    // or create new mini Modernizr that just has the 3 tests
-    Modernizr = window.Modernizr = {
-      _version : '1.6ish: miniModernizr for Isotope'
-    };
-
-    var classes = ' ';
-    var result;
-
-    // Run through tests
-    for ( testName in tests) {
-      result = tests[ testName ]();
-      Modernizr[ testName ] = result;
-      classes += ' ' + ( result ?  '' : 'no-' ) + testName;
-    }
-
-    // Add the new classes to the <html> element.
-    $('html').addClass( classes );
-  }
-
-
-  // ========================= isoTransform ===============================
-
-  /**
-   *  provides hooks for .css({ scale: value, translate: [x, y] })
-   *  Progressively enhanced CSS transforms
-   *  Uses hardware accelerated 3D transforms for Safari
-   *  or falls back to 2D transforms.
-   */
-
-  if ( Modernizr.csstransforms ) {
-
-        // i.e. transformFnNotations.scale(0.5) >> 'scale3d( 0.5, 0.5, 1)'
-    var transformFnNotations = Modernizr.csstransforms3d ?
-      { // 3D transform functions
-        translate : function ( position ) {
-          return 'translate3d(' + position[0] + 'px, ' + position[1] + 'px, 0) ';
-        },
-        scale : function ( scale ) {
-          return 'scale3d(' + scale + ', ' + scale + ', 1) ';
-        }
-      } :
-      { // 2D transform functions
-        translate : function ( position ) {
-          return 'translate(' + position[0] + 'px, ' + position[1] + 'px) ';
-        },
-        scale : function ( scale ) {
-          return 'scale(' + scale + ') ';
-        }
-      }
-    ;
-
-    var setIsoTransform = function ( elem, name, value ) {
-          // unpack current transform data
-      var data =  $.data( elem, 'isoTransform' ) || {},
-          newData = {},
-          fnName,
-          transformObj = {},
-          transformValue;
-
-      // i.e. newData.scale = 0.5
-      newData[ name ] = value;
-      // extend new value over current data
-      $.extend( data, newData );
-
-      for ( fnName in data ) {
-        transformValue = data[ fnName ];
-        transformObj[ fnName ] = transformFnNotations[ fnName ]( transformValue );
+      var matchMedia = window.matchMedia || window.msMatchMedia;
+      if ( matchMedia ) {
+        return matchMedia(mq) && matchMedia(mq).matches || false;
       }
 
-      // get proper order
-      // ideally, we could loop through this give an array, but since we only have
-      // a couple transforms we're keeping track of, we'll do it like so
-      var translateFn = transformObj.translate || '',
-          scaleFn = transformObj.scale || '',
-          // sorting so translate always comes first
-          valueFns = translateFn + scaleFn;
+      var bool;
 
-      // set data back in elem
-      $.data( elem, 'isoTransform', data );
+      injectElementWithStyles('@media ' + mq + ' { #' + mod + ' { position: absolute; } }', function( node ) {
+        bool = (window.getComputedStyle ?
+                  getComputedStyle(node, null) :
+                  node.currentStyle)['position'] == 'absolute';
+      });
 
-      // set name to vendor specific property
-      elem.style[ transformProp ] = valueFns;
-    };
+      return bool;
 
-    // ==================== scale ===================
-
-    $.cssNumber.scale = true;
-
-    $.cssHooks.scale = {
-      set: function( elem, value ) {
-        // uncomment this bit if you want to properly parse strings
-        // if ( typeof value === 'string' ) {
-        //   value = parseFloat( value );
-        // }
-        setIsoTransform( elem, 'scale', value );
-      },
-      get: function( elem, computed ) {
-        var transform = $.data( elem, 'isoTransform' );
-        return transform && transform.scale ? transform.scale : 1;
-      }
-    };
-
-    $.fx.step.scale = function( fx ) {
-      $.cssHooks.scale.set( fx.elem, fx.now+fx.unit );
-    };
+     },
+     /*>>mq*/
 
 
-    // ==================== translate ===================
+    /*>>hasevent*/
+    //
+    // isEventSupported determines if a given element supports the given event
+    // kangax.github.com/iseventsupported/
+    //
+    // The following results are known incorrects:
+    //   Modernizr.hasEvent("webkitTransitionEnd", elem) // false negative
+    //   Modernizr.hasEvent("textInput") // in Webkit. github.com/Modernizr/Modernizr/issues/333
+    //   ...
+    isEventSupported = (function() {
 
-    $.cssNumber.translate = true;
-
-    $.cssHooks.translate = {
-      set: function( elem, value ) {
-
-        // uncomment this bit if you want to properly parse strings
-        // if ( typeof value === 'string' ) {
-        //   value = value.split(' ');
-        // }
-        //
-        // var i, val;
-        // for ( i = 0; i < 2; i++ ) {
-        //   val = value[i];
-        //   if ( typeof val === 'string' ) {
-        //     val = parseInt( val );
-        //   }
-        // }
-
-        setIsoTransform( elem, 'translate', value );
-      },
-
-      get: function( elem, computed ) {
-        var transform = $.data( elem, 'isoTransform' );
-        return transform && transform.translate ? transform.translate : [ 0, 0 ];
-      }
-    };
-
-  }
-
-  // ========================= get transition-end event ===============================
-  var transitionEndEvent, transitionDurProp;
-
-  if ( Modernizr.csstransitions ) {
-    transitionEndEvent = {
-      WebkitTransitionProperty: 'webkitTransitionEnd',  // webkit
-      MozTransitionProperty: 'transitionend',
-      OTransitionProperty: 'oTransitionEnd otransitionend',
-      transitionProperty: 'transitionend'
-    }[ transitionProp ];
-
-    transitionDurProp = getStyleProperty('transitionDuration');
-  }
-
-  // ========================= smartresize ===============================
-
-  /*
-   * smartresize: debounced resize event for jQuery
-   *
-   * latest version and complete README available on Github:
-   * https://github.com/louisremi/jquery.smartresize.js
-   *
-   * Copyright 2011 @louis_remi
-   * Licensed under the MIT license.
-   */
-
-  var $event = $.event,
-      dispatchMethod = $.event.handle ? 'handle' : 'dispatch',
-      resizeTimeout;
-
-  $event.special.smartresize = {
-    setup: function() {
-      $(this).bind( "resize", $event.special.smartresize.handler );
-    },
-    teardown: function() {
-      $(this).unbind( "resize", $event.special.smartresize.handler );
-    },
-    handler: function( event, execAsap ) {
-      // Save the context
-      var context = this,
-          args = arguments;
-
-      // set correct event type
-      event.type = "smartresize";
-
-      if ( resizeTimeout ) { clearTimeout( resizeTimeout ); }
-      resizeTimeout = setTimeout(function() {
-        $event[ dispatchMethod ].apply( context, args );
-      }, execAsap === "execAsap"? 0 : 100 );
-    }
-  };
-
-  $.fn.smartresize = function( fn ) {
-    return fn ? this.bind( "smartresize", fn ) : this.trigger( "smartresize", ["execAsap"] );
-  };
-
-
-
-// ========================= Isotope ===============================
-
-
-  // our "Widget" object constructor
-  $.Isotope = function( options, element, callback ){
-    this.element = $( element );
-
-    this._create( options );
-    this._init( callback );
-  };
-
-  // styles of container element we want to keep track of
-  var isoContainerStyles = [ 'width', 'height' ];
-
-  var $window = $(window);
-
-  $.Isotope.settings = {
-    resizable: true,
-    layoutMode : 'masonry',
-    containerClass : 'isotope',
-    itemClass : 'isotope-item',
-    hiddenClass : 'isotope-hidden',
-    hiddenStyle: { opacity: 0, scale: 0.001 },
-    visibleStyle: { opacity: 1, scale: 1 },
-    containerStyle: {
-      position: 'relative',
-      overflow: 'hidden'
-    },
-    animationEngine: 'best-available',
-    animationOptions: {
-      queue: false,
-      duration: 800
-    },
-    sortBy : 'original-order',
-    sortAscending : true,
-    resizesContainer : true,
-    transformsEnabled: true,
-    itemPositionDataEnabled: false
-  };
-
-  $.Isotope.prototype = {
-
-    // sets up widget
-    _create : function( options ) {
-
-      this.options = $.extend( {}, $.Isotope.settings, options );
-
-      this.styleQueue = [];
-      this.elemCount = 0;
-
-      // get original styles in case we re-apply them in .destroy()
-      var elemStyle = this.element[0].style;
-      this.originalStyle = {};
-      // keep track of container styles
-      var containerStyles = isoContainerStyles.slice(0);
-      for ( var prop in this.options.containerStyle ) {
-        containerStyles.push( prop );
-      }
-      for ( var i=0, len = containerStyles.length; i < len; i++ ) {
-        prop = containerStyles[i];
-        this.originalStyle[ prop ] = elemStyle[ prop ] || '';
-      }
-      // apply container style from options
-      this.element.css( this.options.containerStyle );
-
-      this._updateAnimationEngine();
-      this._updateUsingTransforms();
-
-      // sorting
-      var originalOrderSorter = {
-        'original-order' : function( $elem, instance ) {
-          instance.elemCount ++;
-          return instance.elemCount;
-        },
-        random : function() {
-          return Math.random();
-        }
+      var TAGNAMES = {
+        'select': 'input', 'change': 'input',
+        'submit': 'form', 'reset': 'form',
+        'error': 'img', 'load': 'img', 'abort': 'img'
       };
 
-      this.options.getSortData = $.extend( this.options.getSortData, originalOrderSorter );
+      function isEventSupported( eventName, element ) {
 
-      // need to get atoms
-      this.reloadItems();
+        element = element || document.createElement(TAGNAMES[eventName] || 'div');
+        eventName = 'on' + eventName;
 
-      // get top left position of where the bricks should be
-      this.offset = {
-        left: parseInt( ( this.element.css('padding-left') || 0 ), 10 ),
-        top: parseInt( ( this.element.css('padding-top') || 0 ), 10 )
-      };
+        // When using `setAttribute`, IE skips "unload", WebKit skips "unload" and "resize", whereas `in` "catches" those
+        var isSupported = eventName in element;
 
-      // add isotope class first time around
-      var instance = this;
-      setTimeout( function() {
-        instance.element.addClass( instance.options.containerClass );
-      }, 0 );
-
-      // bind resize method
-      if ( this.options.resizable ) {
-        $window.bind( 'smartresize.isotope', function() {
-          instance.resize();
-        });
-      }
-
-      // dismiss all click events from hidden events
-      this.element.delegate( '.' + this.options.hiddenClass, 'click', function(){
-        return false;
-      });
-
-    },
-
-    _getAtoms : function( $elems ) {
-      var selector = this.options.itemSelector,
-          // filter & find
-          $atoms = selector ? $elems.filter( selector ).add( $elems.find( selector ) ) : $elems,
-          // base style for atoms
-          atomStyle = { position: 'absolute' };
-
-      // filter out text nodes
-      $atoms = $atoms.filter( function( i, atom ) {
-        return atom.nodeType === 1;
-      });
-
-      if ( this.usingTransforms ) {
-        atomStyle.left = 0;
-        atomStyle.top = 0;
-      }
-
-      $atoms.css( atomStyle ).addClass( this.options.itemClass );
-
-      this.updateSortData( $atoms, true );
-
-      return $atoms;
-    },
-
-    // _init fires when your instance is first created
-    // (from the constructor above), and when you
-    // attempt to initialize the widget again (by the bridge)
-    // after it has already been initialized.
-    _init : function( callback ) {
-
-      this.$filteredAtoms = this._filter( this.$allAtoms );
-      this._sort();
-      this.reLayout( callback );
-
-    },
-
-    option : function( opts ){
-      // change options AFTER initialization:
-      // signature: $('#foo').bar({ cool:false });
-      if ( $.isPlainObject( opts ) ){
-        this.options = $.extend( true, this.options, opts );
-
-        // trigger _updateOptionName if it exists
-        var updateOptionFn;
-        for ( var optionName in opts ) {
-          updateOptionFn = '_update' + capitalize( optionName );
-          if ( this[ updateOptionFn ] ) {
-            this[ updateOptionFn ]();
+        if ( !isSupported ) {
+          // If it has no `setAttribute` (i.e. doesn't implement Node interface), try generic element
+          if ( !element.setAttribute ) {
+            element = document.createElement('div');
           }
-        }
-      }
-    },
+          if ( element.setAttribute && element.removeAttribute ) {
+            element.setAttribute(eventName, '');
+            isSupported = is(element[eventName], 'function');
 
-    // ====================== updaters ====================== //
-    // kind of like setters
-
-    _updateAnimationEngine : function() {
-      var animationEngine = this.options.animationEngine.toLowerCase().replace( /[ _\-]/g, '');
-      var isUsingJQueryAnimation;
-      // set applyStyleFnName
-      switch ( animationEngine ) {
-        case 'css' :
-        case 'none' :
-          isUsingJQueryAnimation = false;
-          break;
-        case 'jquery' :
-          isUsingJQueryAnimation = true;
-          break;
-        default : // best available
-          isUsingJQueryAnimation = !Modernizr.csstransitions;
-      }
-      this.isUsingJQueryAnimation = isUsingJQueryAnimation;
-      this._updateUsingTransforms();
-    },
-
-    _updateTransformsEnabled : function() {
-      this._updateUsingTransforms();
-    },
-
-    _updateUsingTransforms : function() {
-      var usingTransforms = this.usingTransforms = this.options.transformsEnabled &&
-        Modernizr.csstransforms && Modernizr.csstransitions && !this.isUsingJQueryAnimation;
-
-      // prevent scales when transforms are disabled
-      if ( !usingTransforms ) {
-        delete this.options.hiddenStyle.scale;
-        delete this.options.visibleStyle.scale;
-      }
-
-      this.getPositionStyles = usingTransforms ? this._translate : this._positionAbs;
-    },
-
-
-    // ====================== Filtering ======================
-
-    _filter : function( $atoms ) {
-      var filter = this.options.filter === '' ? '*' : this.options.filter;
-
-      if ( !filter ) {
-        return $atoms;
-      }
-
-      var hiddenClass    = this.options.hiddenClass,
-          hiddenSelector = '.' + hiddenClass,
-          $hiddenAtoms   = $atoms.filter( hiddenSelector ),
-          $atomsToShow   = $hiddenAtoms;
-
-      if ( filter !== '*' ) {
-        $atomsToShow = $hiddenAtoms.filter( filter );
-        var $atomsToHide = $atoms.not( hiddenSelector ).not( filter ).addClass( hiddenClass );
-        this.styleQueue.push({ $el: $atomsToHide, style: this.options.hiddenStyle });
-      }
-
-      this.styleQueue.push({ $el: $atomsToShow, style: this.options.visibleStyle });
-      $atomsToShow.removeClass( hiddenClass );
-
-      return $atoms.filter( filter );
-    },
-
-    // ====================== Sorting ======================
-
-    updateSortData : function( $atoms, isIncrementingElemCount ) {
-      var instance = this,
-          getSortData = this.options.getSortData,
-          $this, sortData;
-      $atoms.each(function(){
-        $this = $(this);
-        sortData = {};
-        // get value for sort data based on fn( $elem ) passed in
-        for ( var key in getSortData ) {
-          if ( !isIncrementingElemCount && key === 'original-order' ) {
-            // keep original order original
-            sortData[ key ] = $.data( this, 'isotope-sort-data' )[ key ];
-          } else {
-            sortData[ key ] = getSortData[ key ]( $this, instance );
-          }
-        }
-        // apply sort data to element
-        $.data( this, 'isotope-sort-data', sortData );
-      });
-    },
-
-    // used on all the filtered atoms
-    _sort : function() {
-
-      var sortBy = this.options.sortBy,
-          getSorter = this._getSorter,
-          sortDir = this.options.sortAscending ? 1 : -1,
-          sortFn = function( alpha, beta ) {
-            var a = getSorter( alpha, sortBy ),
-                b = getSorter( beta, sortBy );
-            // fall back to original order if data matches
-            if ( a === b && sortBy !== 'original-order') {
-              a = getSorter( alpha, 'original-order' );
-              b = getSorter( beta, 'original-order' );
+            // If property was created, "remove it" (by setting value to `undefined`)
+            if ( !is(element[eventName], 'undefined') ) {
+              element[eventName] = undefined;
             }
-            return ( ( a > b ) ? 1 : ( a < b ) ? -1 : 0 ) * sortDir;
+            element.removeAttribute(eventName);
+          }
+        }
+
+        element = null;
+        return isSupported;
+      }
+      return isEventSupported;
+    })(),
+    /*>>hasevent*/
+
+    // TODO :: Add flag for hasownprop ? didn't last time
+
+    // hasOwnProperty shim by kangax needed for Safari 2.0 support
+    _hasOwnProperty = ({}).hasOwnProperty, hasOwnProp;
+
+    if ( !is(_hasOwnProperty, 'undefined') && !is(_hasOwnProperty.call, 'undefined') ) {
+      hasOwnProp = function (object, property) {
+        return _hasOwnProperty.call(object, property);
+      };
+    }
+    else {
+      hasOwnProp = function (object, property) { /* yes, this can give false positives/negatives, but most of the time we don't care about those */
+        return ((property in object) && is(object.constructor.prototype[property], 'undefined'));
+      };
+    }
+
+    // Adapted from ES5-shim https://github.com/kriskowal/es5-shim/blob/master/es5-shim.js
+    // es5.github.com/#x15.3.4.5
+
+    if (!Function.prototype.bind) {
+      Function.prototype.bind = function bind(that) {
+
+        var target = this;
+
+        if (typeof target != "function") {
+            throw new TypeError();
+        }
+
+        var args = slice.call(arguments, 1),
+            bound = function () {
+
+            if (this instanceof bound) {
+
+              var F = function(){};
+              F.prototype = target.prototype;
+              var self = new F();
+
+              var result = target.apply(
+                  self,
+                  args.concat(slice.call(arguments))
+              );
+              if (Object(result) === result) {
+                  return result;
+              }
+              return self;
+
+            } else {
+
+              return target.apply(
+                  that,
+                  args.concat(slice.call(arguments))
+              );
+
+            }
+
+        };
+
+        return bound;
+      };
+    }
+
+    /**
+     * setCss applies given styles to the Modernizr DOM node.
+     */
+    function setCss( str ) {
+        mStyle.cssText = str;
+    }
+
+    /**
+     * setCssAll extrapolates all vendor-specific css strings.
+     */
+    function setCssAll( str1, str2 ) {
+        return setCss(prefixes.join(str1 + ';') + ( str2 || '' ));
+    }
+
+    /**
+     * is returns a boolean for if typeof obj is exactly type.
+     */
+    function is( obj, type ) {
+        return typeof obj === type;
+    }
+
+    /**
+     * contains returns a boolean for if substr is found within str.
+     */
+    function contains( str, substr ) {
+        return !!~('' + str).indexOf(substr);
+    }
+
+    /*>>testprop*/
+
+    // testProps is a generic CSS / DOM property test.
+
+    // In testing support for a given CSS property, it's legit to test:
+    //    `elem.style[styleName] !== undefined`
+    // If the property is supported it will return an empty string,
+    // if unsupported it will return undefined.
+
+    // We'll take advantage of this quick test and skip setting a style
+    // on our modernizr element, but instead just testing undefined vs
+    // empty string.
+
+    // Because the testing of the CSS property names (with "-", as
+    // opposed to the camelCase DOM properties) is non-portable and
+    // non-standard but works in WebKit and IE (but not Gecko or Opera),
+    // we explicitly reject properties with dashes so that authors
+    // developing in WebKit or IE first don't end up with
+    // browser-specific content by accident.
+
+    function testProps( props, prefixed ) {
+        for ( var i in props ) {
+            var prop = props[i];
+            if ( !contains(prop, "-") && mStyle[prop] !== undefined ) {
+                return prefixed == 'pfx' ? prop : true;
+            }
+        }
+        return false;
+    }
+    /*>>testprop*/
+
+    // TODO :: add testDOMProps
+    /**
+     * testDOMProps is a generic DOM property test; if a browser supports
+     *   a certain property, it won't return undefined for it.
+     */
+    function testDOMProps( props, obj, elem ) {
+        for ( var i in props ) {
+            var item = obj[props[i]];
+            if ( item !== undefined) {
+
+                // return the property name as a string
+                if (elem === false) return props[i];
+
+                // let's bind a function
+                if (is(item, 'function')){
+                  // default to autobind unless override
+                  return item.bind(elem || obj);
+                }
+
+                // return the unbound function or obj or value
+                return item;
+            }
+        }
+        return false;
+    }
+
+    /*>>testallprops*/
+    /**
+     * testPropsAll tests a list of DOM properties we want to check against.
+     *   We specify literally ALL possible (known and/or likely) properties on
+     *   the element including the non-vendor prefixed one, for forward-
+     *   compatibility.
+     */
+    function testPropsAll( prop, prefixed, elem ) {
+
+        var ucProp  = prop.charAt(0).toUpperCase() + prop.slice(1),
+            props   = (prop + ' ' + cssomPrefixes.join(ucProp + ' ') + ucProp).split(' ');
+
+        // did they call .prefixed('boxSizing') or are we just testing a prop?
+        if(is(prefixed, "string") || is(prefixed, "undefined")) {
+          return testProps(props, prefixed);
+
+        // otherwise, they called .prefixed('requestAnimationFrame', window[, elem])
+        } else {
+          props = (prop + ' ' + (domPrefixes).join(ucProp + ' ') + ucProp).split(' ');
+          return testDOMProps(props, prefixed, elem);
+        }
+    }
+    /*>>testallprops*/
+
+
+    /**
+     * Tests
+     * -----
+     */
+
+    // The *new* flexbox
+    // dev.w3.org/csswg/css3-flexbox
+
+    tests['flexbox'] = function() {
+      return testPropsAll('flexWrap');
+    };
+
+    // The *old* flexbox
+    // www.w3.org/TR/2009/WD-css3-flexbox-20090723/
+
+    tests['flexboxlegacy'] = function() {
+        return testPropsAll('boxDirection');
+    };
+
+    // On the S60 and BB Storm, getContext exists, but always returns undefined
+    // so we actually have to call getContext() to verify
+    // github.com/Modernizr/Modernizr/issues/issue/97/
+
+    tests['canvas'] = function() {
+        var elem = document.createElement('canvas');
+        return !!(elem.getContext && elem.getContext('2d'));
+    };
+
+    tests['canvastext'] = function() {
+        return !!(Modernizr['canvas'] && is(document.createElement('canvas').getContext('2d').fillText, 'function'));
+    };
+
+    // webk.it/70117 is tracking a legit WebGL feature detect proposal
+
+    // We do a soft detect which may false positive in order to avoid
+    // an expensive context creation: bugzil.la/732441
+
+    tests['webgl'] = function() {
+        return !!window.WebGLRenderingContext;
+    };
+
+    /*
+     * The Modernizr.touch test only indicates if the browser supports
+     *    touch events, which does not necessarily reflect a touchscreen
+     *    device, as evidenced by tablets running Windows 7 or, alas,
+     *    the Palm Pre / WebOS (touch) phones.
+     *
+     * Additionally, Chrome (desktop) used to lie about its support on this,
+     *    but that has since been rectified: crbug.com/36415
+     *
+     * We also test for Firefox 4 Multitouch Support.
+     *
+     * For more info, see: modernizr.github.com/Modernizr/touch.html
+     */
+
+    tests['touch'] = function() {
+        var bool;
+
+        if(('ontouchstart' in window) || window.DocumentTouch && document instanceof DocumentTouch) {
+          bool = true;
+        } else {
+          injectElementWithStyles(['@media (',prefixes.join('touch-enabled),('),mod,')','{#modernizr{top:9px;position:absolute}}'].join(''), function( node ) {
+            bool = node.offsetTop === 9;
+          });
+        }
+
+        return bool;
+    };
+
+
+    // geolocation is often considered a trivial feature detect...
+    // Turns out, it's quite tricky to get right:
+    //
+    // Using !!navigator.geolocation does two things we don't want. It:
+    //   1. Leaks memory in IE9: github.com/Modernizr/Modernizr/issues/513
+    //   2. Disables page caching in WebKit: webk.it/43956
+    //
+    // Meanwhile, in Firefox < 8, an about:config setting could expose
+    // a false positive that would throw an exception: bugzil.la/688158
+
+    tests['geolocation'] = function() {
+        return 'geolocation' in navigator;
+    };
+
+
+    tests['postmessage'] = function() {
+      return !!window.postMessage;
+    };
+
+
+    // Chrome incognito mode used to throw an exception when using openDatabase
+    // It doesn't anymore.
+    tests['websqldatabase'] = function() {
+      return !!window.openDatabase;
+    };
+
+    // Vendors had inconsistent prefixing with the experimental Indexed DB:
+    // - Webkit's implementation is accessible through webkitIndexedDB
+    // - Firefox shipped moz_indexedDB before FF4b9, but since then has been mozIndexedDB
+    // For speed, we don't test the legacy (and beta-only) indexedDB
+    tests['indexedDB'] = function() {
+      return !!testPropsAll("indexedDB", window);
+    };
+
+    // documentMode logic from YUI to filter out IE8 Compat Mode
+    //   which false positives.
+    tests['hashchange'] = function() {
+      return isEventSupported('hashchange', window) && (document.documentMode === undefined || document.documentMode > 7);
+    };
+
+    // Per 1.6:
+    // This used to be Modernizr.historymanagement but the longer
+    // name has been deprecated in favor of a shorter and property-matching one.
+    // The old API is still available in 1.6, but as of 2.0 will throw a warning,
+    // and in the first release thereafter disappear entirely.
+    tests['history'] = function() {
+      return !!(window.history && history.pushState);
+    };
+
+    tests['draganddrop'] = function() {
+        var div = document.createElement('div');
+        return ('draggable' in div) || ('ondragstart' in div && 'ondrop' in div);
+    };
+
+    // FF3.6 was EOL'ed on 4/24/12, but the ESR version of FF10
+    // will be supported until FF19 (2/12/13), at which time, ESR becomes FF17.
+    // FF10 still uses prefixes, so check for it until then.
+    // for more ESR info, see: mozilla.org/en-US/firefox/organizations/faq/
+    tests['websockets'] = function() {
+        return 'WebSocket' in window || 'MozWebSocket' in window;
+    };
+
+
+    // css-tricks.com/rgba-browser-support/
+    tests['rgba'] = function() {
+        // Set an rgba() color and check the returned value
+
+        setCss('background-color:rgba(150,255,150,.5)');
+
+        return contains(mStyle.backgroundColor, 'rgba');
+    };
+
+    tests['hsla'] = function() {
+        // Same as rgba(), in fact, browsers re-map hsla() to rgba() internally,
+        //   except IE9 who retains it as hsla
+
+        setCss('background-color:hsla(120,40%,100%,.5)');
+
+        return contains(mStyle.backgroundColor, 'rgba') || contains(mStyle.backgroundColor, 'hsla');
+    };
+
+    tests['multiplebgs'] = function() {
+        // Setting multiple images AND a color on the background shorthand property
+        //  and then querying the style.background property value for the number of
+        //  occurrences of "url(" is a reliable method for detecting ACTUAL support for this!
+
+        setCss('background:url(https://),url(https://),red url(https://)');
+
+        // If the UA supports multiple backgrounds, there should be three occurrences
+        //   of the string "url(" in the return value for elemStyle.background
+
+        return (/(url\s*\(.*?){3}/).test(mStyle.background);
+    };
+
+
+
+    // this will false positive in Opera Mini
+    //   github.com/Modernizr/Modernizr/issues/396
+
+    tests['backgroundsize'] = function() {
+        return testPropsAll('backgroundSize');
+    };
+
+    tests['borderimage'] = function() {
+        return testPropsAll('borderImage');
+    };
+
+
+    // Super comprehensive table about all the unique implementations of
+    // border-radius: muddledramblings.com/table-of-css3-border-radius-compliance
+
+    tests['borderradius'] = function() {
+        return testPropsAll('borderRadius');
+    };
+
+    // WebOS unfortunately false positives on this test.
+    tests['boxshadow'] = function() {
+        return testPropsAll('boxShadow');
+    };
+
+    // FF3.0 will false positive on this test
+    tests['textshadow'] = function() {
+        return document.createElement('div').style.textShadow === '';
+    };
+
+
+    tests['opacity'] = function() {
+        // Browsers that actually have CSS Opacity implemented have done so
+        //  according to spec, which means their return values are within the
+        //  range of [0.0,1.0] - including the leading zero.
+
+        setCssAll('opacity:.55');
+
+        // The non-literal . in this regex is intentional:
+        //   German Chrome returns this value as 0,55
+        // github.com/Modernizr/Modernizr/issues/#issue/59/comment/516632
+        return (/^0.55$/).test(mStyle.opacity);
+    };
+
+
+    // Note, Android < 4 will pass this test, but can only animate
+    //   a single property at a time
+    //   goo.gl/v3V4Gp
+    tests['cssanimations'] = function() {
+        return testPropsAll('animationName');
+    };
+
+
+    tests['csscolumns'] = function() {
+        return testPropsAll('columnCount');
+    };
+
+
+    tests['cssgradients'] = function() {
+        /**
+         * For CSS Gradients syntax, please see:
+         * webkit.org/blog/175/introducing-css-gradients/
+         * developer.mozilla.org/en/CSS/-moz-linear-gradient
+         * developer.mozilla.org/en/CSS/-moz-radial-gradient
+         * dev.w3.org/csswg/css3-images/#gradients-
+         */
+
+        var str1 = 'background-image:',
+            str2 = 'gradient(linear,left top,right bottom,from(#9f9),to(white));',
+            str3 = 'linear-gradient(left top,#9f9, white);';
+
+        setCss(
+             // legacy webkit syntax (FIXME: remove when syntax not in use anymore)
+              (str1 + '-webkit- '.split(' ').join(str2 + str1) +
+             // standard syntax             // trailing 'background-image:'
+              prefixes.join(str3 + str1)).slice(0, -str1.length)
+        );
+
+        return contains(mStyle.backgroundImage, 'gradient');
+    };
+
+
+    tests['cssreflections'] = function() {
+        return testPropsAll('boxReflect');
+    };
+
+
+    tests['csstransforms'] = function() {
+        return !!testPropsAll('transform');
+    };
+
+
+    tests['csstransforms3d'] = function() {
+
+        var ret = !!testPropsAll('perspective');
+
+        // Webkit's 3D transforms are passed off to the browser's own graphics renderer.
+        //   It works fine in Safari on Leopard and Snow Leopard, but not in Chrome in
+        //   some conditions. As a result, Webkit typically recognizes the syntax but
+        //   will sometimes throw a false positive, thus we must do a more thorough check:
+        if ( ret && 'webkitPerspective' in docElement.style ) {
+
+          // Webkit allows this media query to succeed only if the feature is enabled.
+          // `@media (transform-3d),(-webkit-transform-3d){ ... }`
+          injectElementWithStyles('@media (transform-3d),(-webkit-transform-3d){#modernizr{left:9px;position:absolute;height:3px;}}', function( node, rule ) {
+            ret = node.offsetLeft === 9 && node.offsetHeight === 3;
+          });
+        }
+        return ret;
+    };
+
+
+    tests['csstransitions'] = function() {
+        return testPropsAll('transition');
+    };
+
+
+    /*>>fontface*/
+    // @font-face detection routine by Diego Perini
+    // javascript.nwbox.com/CSSSupport/
+
+    // false positives:
+    //   WebOS github.com/Modernizr/Modernizr/issues/342
+    //   WP7   github.com/Modernizr/Modernizr/issues/538
+    tests['fontface'] = function() {
+        var bool;
+
+        injectElementWithStyles('@font-face {font-family:"font";src:url("https://")}', function( node, rule ) {
+          var style = document.getElementById('smodernizr'),
+              sheet = style.sheet || style.styleSheet,
+              cssText = sheet ? (sheet.cssRules && sheet.cssRules[0] ? sheet.cssRules[0].cssText : sheet.cssText || '') : '';
+
+          bool = /src/i.test(cssText) && cssText.indexOf(rule.split(' ')[0]) === 0;
+        });
+
+        return bool;
+    };
+    /*>>fontface*/
+
+    // CSS generated content detection
+    tests['generatedcontent'] = function() {
+        var bool;
+
+        injectElementWithStyles(['#',mod,'{font:0/0 a}#',mod,':after{content:"',smile,'";visibility:hidden;font:3px/1 a}'].join(''), function( node ) {
+          bool = node.offsetHeight >= 3;
+        });
+
+        return bool;
+    };
+
+
+
+    // These tests evaluate support of the video/audio elements, as well as
+    // testing what types of content they support.
+    //
+    // We're using the Boolean constructor here, so that we can extend the value
+    // e.g.  Modernizr.video     // true
+    //       Modernizr.video.ogg // 'probably'
+    //
+    // Codec values from : github.com/NielsLeenheer/html5test/blob/9106a8/index.html#L845
+    //                     thx to NielsLeenheer and zcorpan
+
+    // Note: in some older browsers, "no" was a return value instead of empty string.
+    //   It was live in FF3.5.0 and 3.5.1, but fixed in 3.5.2
+    //   It was also live in Safari 4.0.0 - 4.0.4, but fixed in 4.0.5
+
+    tests['video'] = function() {
+        var elem = document.createElement('video'),
+            bool = false;
+
+        // IE9 Running on Windows Server SKU can cause an exception to be thrown, bug #224
+        try {
+            if ( bool = !!elem.canPlayType ) {
+                bool      = new Boolean(bool);
+                bool.ogg  = elem.canPlayType('video/ogg; codecs="theora"')      .replace(/^no$/,'');
+
+                // Without QuickTime, this value will be `undefined`. github.com/Modernizr/Modernizr/issues/546
+                bool.h264 = elem.canPlayType('video/mp4; codecs="avc1.42E01E"') .replace(/^no$/,'');
+
+                bool.webm = elem.canPlayType('video/webm; codecs="vp8, vorbis"').replace(/^no$/,'');
+            }
+
+        } catch(e) { }
+
+        return bool;
+    };
+
+    tests['audio'] = function() {
+        var elem = document.createElement('audio'),
+            bool = false;
+
+        try {
+            if ( bool = !!elem.canPlayType ) {
+                bool      = new Boolean(bool);
+                bool.ogg  = elem.canPlayType('audio/ogg; codecs="vorbis"').replace(/^no$/,'');
+                bool.mp3  = elem.canPlayType('audio/mpeg;')               .replace(/^no$/,'');
+
+                // Mimetypes accepted:
+                //   developer.mozilla.org/En/Media_formats_supported_by_the_audio_and_video_elements
+                //   bit.ly/iphoneoscodecs
+                bool.wav  = elem.canPlayType('audio/wav; codecs="1"')     .replace(/^no$/,'');
+                bool.m4a  = ( elem.canPlayType('audio/x-m4a;')            ||
+                              elem.canPlayType('audio/aac;'))             .replace(/^no$/,'');
+            }
+        } catch(e) { }
+
+        return bool;
+    };
+
+
+    // In FF4, if disabled, window.localStorage should === null.
+
+    // Normally, we could not test that directly and need to do a
+    //   `('localStorage' in window) && ` test first because otherwise Firefox will
+    //   throw bugzil.la/365772 if cookies are disabled
+
+    // Also in iOS5 Private Browsing mode, attempting to use localStorage.setItem
+    // will throw the exception:
+    //   QUOTA_EXCEEDED_ERRROR DOM Exception 22.
+    // Peculiarly, getItem and removeItem calls do not throw.
+
+    // Because we are forced to try/catch this, we'll go aggressive.
+
+    // Just FWIW: IE8 Compat mode supports these features completely:
+    //   www.quirksmode.org/dom/html5.html
+    // But IE8 doesn't support either with local files
+
+    tests['localstorage'] = function() {
+        try {
+            localStorage.setItem(mod, mod);
+            localStorage.removeItem(mod);
+            return true;
+        } catch(e) {
+            return false;
+        }
+    };
+
+    tests['sessionstorage'] = function() {
+        try {
+            sessionStorage.setItem(mod, mod);
+            sessionStorage.removeItem(mod);
+            return true;
+        } catch(e) {
+            return false;
+        }
+    };
+
+
+    tests['webworkers'] = function() {
+        return !!window.Worker;
+    };
+
+
+    tests['applicationcache'] = function() {
+        return !!window.applicationCache;
+    };
+
+
+    // Thanks to Erik Dahlstrom
+    tests['svg'] = function() {
+        return !!document.createElementNS && !!document.createElementNS(ns.svg, 'svg').createSVGRect;
+    };
+
+    // specifically for SVG inline in HTML, not within XHTML
+    // test page: paulirish.com/demo/inline-svg
+    tests['inlinesvg'] = function() {
+      var div = document.createElement('div');
+      div.innerHTML = '<svg/>';
+      return (div.firstChild && div.firstChild.namespaceURI) == ns.svg;
+    };
+
+    // SVG SMIL animation
+    tests['smil'] = function() {
+        return !!document.createElementNS && /SVGAnimate/.test(toString.call(document.createElementNS(ns.svg, 'animate')));
+    };
+
+    // This test is only for clip paths in SVG proper, not clip paths on HTML content
+    // demo: srufaculty.sru.edu/david.dailey/svg/newstuff/clipPath4.svg
+
+    // However read the comments to dig into applying SVG clippaths to HTML content here:
+    //   github.com/Modernizr/Modernizr/issues/213#issuecomment-1149491
+    tests['svgclippaths'] = function() {
+        return !!document.createElementNS && /SVGClipPath/.test(toString.call(document.createElementNS(ns.svg, 'clipPath')));
+    };
+
+    /*>>webforms*/
+    // input features and input types go directly onto the ret object, bypassing the tests loop.
+    // Hold this guy to execute in a moment.
+    function webforms() {
+        /*>>input*/
+        // Run through HTML5's new input attributes to see if the UA understands any.
+        // We're using f which is the <input> element created early on
+        // Mike Taylr has created a comprehensive resource for testing these attributes
+        //   when applied to all input types:
+        //   miketaylr.com/code/input-type-attr.html
+        // spec: www.whatwg.org/specs/web-apps/current-work/multipage/the-input-element.html#input-type-attr-summary
+
+        // Only input placeholder is tested while textarea's placeholder is not.
+        // Currently Safari 4 and Opera 11 have support only for the input placeholder
+        // Both tests are available in feature-detects/forms-placeholder.js
+        Modernizr['input'] = (function( props ) {
+            for ( var i = 0, len = props.length; i < len; i++ ) {
+                attrs[ props[i] ] = !!(props[i] in inputElem);
+            }
+            if (attrs.list){
+              // safari false positive's on datalist: webk.it/74252
+              // see also github.com/Modernizr/Modernizr/issues/146
+              attrs.list = !!(document.createElement('datalist') && window.HTMLDataListElement);
+            }
+            return attrs;
+        })('autocomplete autofocus list placeholder max min multiple pattern required step'.split(' '));
+        /*>>input*/
+
+        /*>>inputtypes*/
+        // Run through HTML5's new input types to see if the UA understands any.
+        //   This is put behind the tests runloop because it doesn't return a
+        //   true/false like all the other tests; instead, it returns an object
+        //   containing each input type with its corresponding true/false value
+
+        // Big thanks to @miketaylr for the html5 forms expertise. miketaylr.com/
+        Modernizr['inputtypes'] = (function(props) {
+
+            for ( var i = 0, bool, inputElemType, defaultView, len = props.length; i < len; i++ ) {
+
+                inputElem.setAttribute('type', inputElemType = props[i]);
+                bool = inputElem.type !== 'text';
+
+                // We first check to see if the type we give it sticks..
+                // If the type does, we feed it a textual value, which shouldn't be valid.
+                // If the value doesn't stick, we know there's input sanitization which infers a custom UI
+                if ( bool ) {
+
+                    inputElem.value         = smile;
+                    inputElem.style.cssText = 'position:absolute;visibility:hidden;';
+
+                    if ( /^range$/.test(inputElemType) && inputElem.style.WebkitAppearance !== undefined ) {
+
+                      docElement.appendChild(inputElem);
+                      defaultView = document.defaultView;
+
+                      // Safari 2-4 allows the smiley as a value, despite making a slider
+                      bool =  defaultView.getComputedStyle &&
+                              defaultView.getComputedStyle(inputElem, null).WebkitAppearance !== 'textfield' &&
+                              // Mobile android web browser has false positive, so must
+                              // check the height to see if the widget is actually there.
+                              (inputElem.offsetHeight !== 0);
+
+                      docElement.removeChild(inputElem);
+
+                    } else if ( /^(search|tel)$/.test(inputElemType) ){
+                      // Spec doesn't define any special parsing or detectable UI
+                      //   behaviors so we pass these through as true
+
+                      // Interestingly, opera fails the earlier test, so it doesn't
+                      //  even make it here.
+
+                    } else if ( /^(url|email)$/.test(inputElemType) ) {
+                      // Real url and email support comes with prebaked validation.
+                      bool = inputElem.checkValidity && inputElem.checkValidity() === false;
+
+                    } else {
+                      // If the upgraded input compontent rejects the :) text, we got a winner
+                      bool = inputElem.value != smile;
+                    }
+                }
+
+                inputs[ props[i] ] = !!bool;
+            }
+            return inputs;
+        })('search tel url email datetime date month week time datetime-local number range color'.split(' '));
+        /*>>inputtypes*/
+    }
+    /*>>webforms*/
+
+
+    // End of test definitions
+    // -----------------------
+
+
+
+    // Run through all tests and detect their support in the current UA.
+    // todo: hypothetically we could be doing an array of tests and use a basic loop here.
+    for ( var feature in tests ) {
+        if ( hasOwnProp(tests, feature) ) {
+            // run the test, throw the return value into the Modernizr,
+            //   then based on that boolean, define an appropriate className
+            //   and push it into an array of classes we'll join later.
+            featureName  = feature.toLowerCase();
+            Modernizr[featureName] = tests[feature]();
+
+            classes.push((Modernizr[featureName] ? '' : 'no-') + featureName);
+        }
+    }
+
+    /*>>webforms*/
+    // input tests need to run.
+    Modernizr.input || webforms();
+    /*>>webforms*/
+
+
+    /**
+     * addTest allows the user to define their own feature tests
+     * the result will be added onto the Modernizr object,
+     * as well as an appropriate className set on the html element
+     *
+     * @param feature - String naming the feature
+     * @param test - Function returning true if feature is supported, false if not
+     */
+     Modernizr.addTest = function ( feature, test ) {
+       if ( typeof feature == 'object' ) {
+         for ( var key in feature ) {
+           if ( hasOwnProp( feature, key ) ) {
+             Modernizr.addTest( key, feature[ key ] );
+           }
+         }
+       } else {
+
+         feature = feature.toLowerCase();
+
+         if ( Modernizr[feature] !== undefined ) {
+           // we're going to quit if you're trying to overwrite an existing test
+           // if we were to allow it, we'd do this:
+           //   var re = new RegExp("\\b(no-)?" + feature + "\\b");
+           //   docElement.className = docElement.className.replace( re, '' );
+           // but, no rly, stuff 'em.
+           return Modernizr;
+         }
+
+         test = typeof test == 'function' ? test() : test;
+
+         if (typeof enableClasses !== "undefined" && enableClasses) {
+           docElement.className += ' ' + (test ? '' : 'no-') + feature;
+         }
+         Modernizr[feature] = test;
+
+       }
+
+       return Modernizr; // allow chaining.
+     };
+
+
+    // Reset modElem.cssText to nothing to reduce memory footprint.
+    setCss('');
+    modElem = inputElem = null;
+
+    /*>>shiv*/
+    /**
+     * @preserve HTML5 Shiv prev3.7.1 | @afarkas @jdalton @jon_neal @rem | MIT/GPL2 Licensed
+     */
+    ;(function(window, document) {
+        /*jshint evil:true */
+        /** version */
+        var version = '3.7.0';
+
+        /** Preset options */
+        var options = window.html5 || {};
+
+        /** Used to skip problem elements */
+        var reSkip = /^<|^(?:button|map|select|textarea|object|iframe|option|optgroup)$/i;
+
+        /** Not all elements can be cloned in IE **/
+        var saveClones = /^(?:a|b|code|div|fieldset|h1|h2|h3|h4|h5|h6|i|label|li|ol|p|q|span|strong|style|table|tbody|td|th|tr|ul)$/i;
+
+        /** Detect whether the browser supports default html5 styles */
+        var supportsHtml5Styles;
+
+        /** Name of the expando, to work with multiple documents or to re-shiv one document */
+        var expando = '_html5shiv';
+
+        /** The id for the the documents expando */
+        var expanID = 0;
+
+        /** Cached data for each document */
+        var expandoData = {};
+
+        /** Detect whether the browser supports unknown elements */
+        var supportsUnknownElements;
+
+        (function() {
+          try {
+            var a = document.createElement('a');
+            a.innerHTML = '<xyz></xyz>';
+            //if the hidden property is implemented we can assume, that the browser supports basic HTML5 Styles
+            supportsHtml5Styles = ('hidden' in a);
+
+            supportsUnknownElements = a.childNodes.length == 1 || (function() {
+              // assign a false positive if unable to shiv
+              (document.createElement)('a');
+              var frag = document.createDocumentFragment();
+              return (
+                typeof frag.cloneNode == 'undefined' ||
+                typeof frag.createDocumentFragment == 'undefined' ||
+                typeof frag.createElement == 'undefined'
+              );
+            }());
+          } catch(e) {
+            // assign a false positive if detection fails => unable to shiv
+            supportsHtml5Styles = true;
+            supportsUnknownElements = true;
+          }
+
+        }());
+
+        /*--------------------------------------------------------------------------*/
+
+        /**
+         * Creates a style sheet with the given CSS text and adds it to the document.
+         * @private
+         * @param {Document} ownerDocument The document.
+         * @param {String} cssText The CSS text.
+         * @returns {StyleSheet} The style element.
+         */
+        function addStyleSheet(ownerDocument, cssText) {
+          var p = ownerDocument.createElement('p'),
+          parent = ownerDocument.getElementsByTagName('head')[0] || ownerDocument.documentElement;
+
+          p.innerHTML = 'x<style>' + cssText + '</style>';
+          return parent.insertBefore(p.lastChild, parent.firstChild);
+        }
+
+        /**
+         * Returns the value of `html5.elements` as an array.
+         * @private
+         * @returns {Array} An array of shived element node names.
+         */
+        function getElements() {
+          var elements = html5.elements;
+          return typeof elements == 'string' ? elements.split(' ') : elements;
+        }
+
+        /**
+         * Returns the data associated to the given document
+         * @private
+         * @param {Document} ownerDocument The document.
+         * @returns {Object} An object of data.
+         */
+        function getExpandoData(ownerDocument) {
+          var data = expandoData[ownerDocument[expando]];
+          if (!data) {
+            data = {};
+            expanID++;
+            ownerDocument[expando] = expanID;
+            expandoData[expanID] = data;
+          }
+          return data;
+        }
+
+        /**
+         * returns a shived element for the given nodeName and document
+         * @memberOf html5
+         * @param {String} nodeName name of the element
+         * @param {Document} ownerDocument The context document.
+         * @returns {Object} The shived element.
+         */
+        function createElement(nodeName, ownerDocument, data){
+          if (!ownerDocument) {
+            ownerDocument = document;
+          }
+          if(supportsUnknownElements){
+            return ownerDocument.createElement(nodeName);
+          }
+          if (!data) {
+            data = getExpandoData(ownerDocument);
+          }
+          var node;
+
+          if (data.cache[nodeName]) {
+            node = data.cache[nodeName].cloneNode();
+          } else if (saveClones.test(nodeName)) {
+            node = (data.cache[nodeName] = data.createElem(nodeName)).cloneNode();
+          } else {
+            node = data.createElem(nodeName);
+          }
+
+          // Avoid adding some elements to fragments in IE < 9 because
+          // * Attributes like `name` or `type` cannot be set/changed once an element
+          //   is inserted into a document/fragment
+          // * Link elements with `src` attributes that are inaccessible, as with
+          //   a 403 response, will cause the tab/window to crash
+          // * Script elements appended to fragments will execute when their `src`
+          //   or `text` property is set
+          return node.canHaveChildren && !reSkip.test(nodeName) && !node.tagUrn ? data.frag.appendChild(node) : node;
+        }
+
+        /**
+         * returns a shived DocumentFragment for the given document
+         * @memberOf html5
+         * @param {Document} ownerDocument The context document.
+         * @returns {Object} The shived DocumentFragment.
+         */
+        function createDocumentFragment(ownerDocument, data){
+          if (!ownerDocument) {
+            ownerDocument = document;
+          }
+          if(supportsUnknownElements){
+            return ownerDocument.createDocumentFragment();
+          }
+          data = data || getExpandoData(ownerDocument);
+          var clone = data.frag.cloneNode(),
+          i = 0,
+          elems = getElements(),
+          l = elems.length;
+          for(;i<l;i++){
+            clone.createElement(elems[i]);
+          }
+          return clone;
+        }
+
+        /**
+         * Shivs the `createElement` and `createDocumentFragment` methods of the document.
+         * @private
+         * @param {Document|DocumentFragment} ownerDocument The document.
+         * @param {Object} data of the document.
+         */
+        function shivMethods(ownerDocument, data) {
+          if (!data.cache) {
+            data.cache = {};
+            data.createElem = ownerDocument.createElement;
+            data.createFrag = ownerDocument.createDocumentFragment;
+            data.frag = data.createFrag();
+          }
+
+
+          ownerDocument.createElement = function(nodeName) {
+            //abort shiv
+            if (!html5.shivMethods) {
+              return data.createElem(nodeName);
+            }
+            return createElement(nodeName, ownerDocument, data);
           };
 
-      this.$filteredAtoms.sort( sortFn );
-    },
+          ownerDocument.createDocumentFragment = Function('h,f', 'return function(){' +
+                                                          'var n=f.cloneNode(),c=n.createElement;' +
+                                                          'h.shivMethods&&(' +
+                                                          // unroll the `createElement` calls
+                                                          getElements().join().replace(/[\w\-]+/g, function(nodeName) {
+            data.createElem(nodeName);
+            data.frag.createElement(nodeName);
+            return 'c("' + nodeName + '")';
+          }) +
+            ');return n}'
+                                                         )(html5, data.frag);
+        }
 
-    _getSorter : function( elem, sortBy ) {
-      return $.data( elem, 'isotope-sort-data' )[ sortBy ];
-    },
+        /*--------------------------------------------------------------------------*/
 
-    // ====================== Layout Helpers ======================
+        /**
+         * Shivs the given document.
+         * @memberOf html5
+         * @param {Document} ownerDocument The document to shiv.
+         * @returns {Document} The shived document.
+         */
+        function shivDocument(ownerDocument) {
+          if (!ownerDocument) {
+            ownerDocument = document;
+          }
+          var data = getExpandoData(ownerDocument);
 
-    _translate : function( x, y ) {
-      return { translate : [ x, y ] };
-    },
+          if (html5.shivCSS && !supportsHtml5Styles && !data.hasCSS) {
+            data.hasCSS = !!addStyleSheet(ownerDocument,
+                                          // corrects block display not defined in IE6/7/8/9
+                                          'article,aside,dialog,figcaption,figure,footer,header,hgroup,main,nav,section{display:block}' +
+                                            // adds styling not present in IE6/7/8/9
+                                            'mark{background:#FF0;color:#000}' +
+                                            // hides non-rendered elements
+                                            'template{display:none}'
+                                         );
+          }
+          if (!supportsUnknownElements) {
+            shivMethods(ownerDocument, data);
+          }
+          return ownerDocument;
+        }
 
-    _positionAbs : function( x, y ) {
-      return { left: x, top: y };
-    },
+        /*--------------------------------------------------------------------------*/
 
-    _pushPosition : function( $elem, x, y ) {
-      x = Math.round( x + this.offset.left );
-      y = Math.round( y + this.offset.top );
-      var position = this.getPositionStyles( x, y );
-      this.styleQueue.push({ $el: $elem, style: position });
-      if ( this.options.itemPositionDataEnabled ) {
-        $elem.data('isotope-item-position', {x: x, y: y} );
-      }
-    },
+        /**
+         * The `html5` object is exposed so that more elements can be shived and
+         * existing shiving can be detected on iframes.
+         * @type Object
+         * @example
+         *
+         * // options can be changed before the script is included
+         * html5 = { 'elements': 'mark section', 'shivCSS': false, 'shivMethods': false };
+         */
+        var html5 = {
 
+          /**
+           * An array or space separated string of node names of the elements to shiv.
+           * @memberOf html5
+           * @type Array|String
+           */
+          'elements': options.elements || 'abbr article aside audio bdi canvas data datalist details dialog figcaption figure footer header hgroup main mark meter nav output progress section summary template time video',
 
-    // ====================== General Layout ======================
+          /**
+           * current version of html5shiv
+           */
+          'version': version,
 
-    // used on collection of atoms (should be filtered, and sorted before )
-    // accepts atoms-to-be-laid-out to start with
-    layout : function( $elems, callback ) {
+          /**
+           * A flag to indicate that the HTML5 style sheet should be inserted.
+           * @memberOf html5
+           * @type Boolean
+           */
+          'shivCSS': (options.shivCSS !== false),
 
-      var layoutMode = this.options.layoutMode;
+          /**
+           * Is equal to true if a browser supports creating unknown/HTML5 elements
+           * @memberOf html5
+           * @type boolean
+           */
+          'supportsUnknownElements': supportsUnknownElements,
 
-      // layout logic
-      this[ '_' +  layoutMode + 'Layout' ]( $elems );
+          /**
+           * A flag to indicate that the document's `createElement` and `createDocumentFragment`
+           * methods should be overwritten.
+           * @memberOf html5
+           * @type Boolean
+           */
+          'shivMethods': (options.shivMethods !== false),
 
-      // set the size of the container
-      if ( this.options.resizesContainer ) {
-        var containerStyle = this[ '_' +  layoutMode + 'GetContainerSize' ]();
-        this.styleQueue.push({ $el: this.element, style: containerStyle });
-      }
+          /**
+           * A string to describe the type of `html5` object ("default" or "default print").
+           * @memberOf html5
+           * @type String
+           */
+          'type': 'default',
 
-      this._processStyleQueue( $elems, callback );
+          // shivs the document according to the specified `html5` object options
+          'shivDocument': shivDocument,
 
-      this.isLaidOut = true;
-    },
+          //creates a shived element
+          createElement: createElement,
 
-    _processStyleQueue : function( $elems, callback ) {
-      // are we animating the layout arrangement?
-      // use plugin-ish syntax for css or animate
-      var styleFn = !this.isLaidOut ? 'css' : (
-            this.isUsingJQueryAnimation ? 'animate' : 'css'
-          ),
-          animOpts = this.options.animationOptions,
-          onLayout = this.options.onLayout,
-          objStyleFn, processor,
-          triggerCallbackNow, callbackFn;
-
-      // default styleQueue processor, may be overwritten down below
-      processor = function( i, obj ) {
-        obj.$el[ styleFn ]( obj.style, animOpts );
-      };
-
-      if ( this._isInserting && this.isUsingJQueryAnimation ) {
-        // if using styleQueue to insert items
-        processor = function( i, obj ) {
-          // only animate if it not being inserted
-          objStyleFn = obj.$el.hasClass('no-transition') ? 'css' : styleFn;
-          obj.$el[ objStyleFn ]( obj.style, animOpts );
+          //creates a shived documentFragment
+          createDocumentFragment: createDocumentFragment
         };
 
-      } else if ( callback || onLayout || animOpts.complete ) {
-        // has callback
-        var isCallbackTriggered = false,
-            // array of possible callbacks to trigger
-            callbacks = [ callback, onLayout, animOpts.complete ],
-            instance = this;
-        triggerCallbackNow = true;
-        // trigger callback only once
-        callbackFn = function() {
-          if ( isCallbackTriggered ) {
-            return;
-          }
-          var hollaback;
-          for (var i=0, len = callbacks.length; i < len; i++) {
-            hollaback = callbacks[i];
-            if ( typeof hollaback === 'function' ) {
-              hollaback.call( instance.element, $elems, instance );
-            }
-          }
-          isCallbackTriggered = true;
-        };
+        /*--------------------------------------------------------------------------*/
 
-        if ( this.isUsingJQueryAnimation && styleFn === 'animate' ) {
-          // add callback to animation options
-          animOpts.complete = callbackFn;
-          triggerCallbackNow = false;
+        // expose html5
+        window.html5 = html5;
 
-        } else if ( Modernizr.csstransitions ) {
-          // detect if first item has transition
-          var i = 0,
-              firstItem = this.styleQueue[0],
-              testElem = firstItem && firstItem.$el,
-              styleObj;
-          // get first non-empty jQ object
-          while ( !testElem || !testElem.length ) {
-            styleObj = this.styleQueue[ i++ ];
-            // HACK: sometimes styleQueue[i] is undefined
-            if ( !styleObj ) {
-              return;
-            }
-            testElem = styleObj.$el;
-          }
-          // get transition duration of the first element in that object
-          // yeah, this is inexact
-          var duration = parseFloat( getComputedStyle( testElem[0] )[ transitionDurProp ] );
-          if ( duration > 0 ) {
-            processor = function( i, obj ) {
-              obj.$el[ styleFn ]( obj.style, animOpts )
-                // trigger callback at transition end
-                .one( transitionEndEvent, callbackFn );
-            };
-            triggerCallbackNow = false;
-          }
-        }
-      }
+        // shiv the document
+        shivDocument(document);
 
-      // process styleQueue
-      $.each( this.styleQueue, processor );
+    }(this, document));
+    /*>>shiv*/
 
-      if ( triggerCallbackNow ) {
-        callbackFn();
-      }
+    // Assign private properties to the return object with prefix
+    Modernizr._version      = version;
 
-      // clear out queue for next time
-      this.styleQueue = [];
-    },
+    // expose these for the plugin API. Look in the source for how to join() them against your input
+    /*>>prefixes*/
+    Modernizr._prefixes     = prefixes;
+    /*>>prefixes*/
+    /*>>domprefixes*/
+    Modernizr._domPrefixes  = domPrefixes;
+    Modernizr._cssomPrefixes  = cssomPrefixes;
+    /*>>domprefixes*/
+
+    /*>>mq*/
+    // Modernizr.mq tests a given media query, live against the current state of the window
+    // A few important notes:
+    //   * If a browser does not support media queries at all (eg. oldIE) the mq() will always return false
+    //   * A max-width or orientation query will be evaluated against the current state, which may change later.
+    //   * You must specify values. Eg. If you are testing support for the min-width media query use:
+    //       Modernizr.mq('(min-width:0)')
+    // usage:
+    // Modernizr.mq('only screen and (max-width:768)')
+    Modernizr.mq            = testMediaQuery;
+    /*>>mq*/
+
+    /*>>hasevent*/
+    // Modernizr.hasEvent() detects support for a given event, with an optional element to test on
+    // Modernizr.hasEvent('gesturestart', elem)
+    Modernizr.hasEvent      = isEventSupported;
+    /*>>hasevent*/
+
+    /*>>testprop*/
+    // Modernizr.testProp() investigates whether a given style property is recognized
+    // Note that the property names must be provided in the camelCase variant.
+    // Modernizr.testProp('pointerEvents')
+    Modernizr.testProp      = function(prop){
+        return testProps([prop]);
+    };
+    /*>>testprop*/
+
+    /*>>testallprops*/
+    // Modernizr.testAllProps() investigates whether a given style property,
+    //   or any of its vendor-prefixed variants, is recognized
+    // Note that the property names must be provided in the camelCase variant.
+    // Modernizr.testAllProps('boxSizing')
+    Modernizr.testAllProps  = testPropsAll;
+    /*>>testallprops*/
 
 
-    resize : function() {
-      if ( this[ '_' + this.options.layoutMode + 'ResizeChanged' ]() ) {
-        this.reLayout();
-      }
-    },
+    /*>>teststyles*/
+    // Modernizr.testStyles() allows you to add custom styles to the document and test an element afterwards
+    // Modernizr.testStyles('#modernizr { position:absolute }', function(elem, rule){ ... })
+    Modernizr.testStyles    = injectElementWithStyles;
+    /*>>teststyles*/
 
 
-    reLayout : function( callback ) {
+    /*>>prefixed*/
+    // Modernizr.prefixed() returns the prefixed or nonprefixed property name variant of your input
+    // Modernizr.prefixed('boxSizing') // 'MozBoxSizing'
 
-      this[ '_' +  this.options.layoutMode + 'Reset' ]();
-      this.layout( this.$filteredAtoms, callback );
+    // Properties must be passed as dom-style camelcase, rather than `box-sizing` hypentated style.
+    // Return values will also be the camelCase variant, if you need to translate that to hypenated style use:
+    //
+    //     str.replace(/([A-Z])/g, function(str,m1){ return '-' + m1.toLowerCase(); }).replace(/^ms-/,'-ms-');
 
-    },
+    // If you're trying to ascertain which transition end event to bind to, you might do something like...
+    //
+    //     var transEndEventNames = {
+    //       'WebkitTransition' : 'webkitTransitionEnd',
+    //       'MozTransition'    : 'transitionend',
+    //       'OTransition'      : 'oTransitionEnd',
+    //       'msTransition'     : 'MSTransitionEnd',
+    //       'transition'       : 'transitionend'
+    //     },
+    //     transEndEventName = transEndEventNames[ Modernizr.prefixed('transition') ];
 
-    // ====================== Convenience methods ======================
-
-    // ====================== Adding items ======================
-
-    // adds a jQuery object of items to a isotope container
-    addItems : function( $content, callback ) {
-      var $newAtoms = this._getAtoms( $content );
-      // add new atoms to atoms pools
-      this.$allAtoms = this.$allAtoms.add( $newAtoms );
-
-      if ( callback ) {
-        callback( $newAtoms );
-      }
-    },
-
-    // convienence method for adding elements properly to any layout
-    // positions items, hides them, then animates them back in <--- very sezzy
-    insert : function( $content, callback ) {
-      // position items
-      this.element.append( $content );
-
-      var instance = this;
-      this.addItems( $content, function( $newAtoms ) {
-        var $newFilteredAtoms = instance._filter( $newAtoms );
-        instance._addHideAppended( $newFilteredAtoms );
-        instance._sort();
-        instance.reLayout();
-        instance._revealAppended( $newFilteredAtoms, callback );
-      });
-
-    },
-
-    // convienence method for working with Infinite Scroll
-    appended : function( $content, callback ) {
-      var instance = this;
-      this.addItems( $content, function( $newAtoms ) {
-        instance._addHideAppended( $newAtoms );
-        instance.layout( $newAtoms );
-        instance._revealAppended( $newAtoms, callback );
-      });
-    },
-
-    // adds new atoms, then hides them before positioning
-    _addHideAppended : function( $newAtoms ) {
-      this.$filteredAtoms = this.$filteredAtoms.add( $newAtoms );
-      $newAtoms.addClass('no-transition');
-
-      this._isInserting = true;
-
-      // apply hidden styles
-      this.styleQueue.push({ $el: $newAtoms, style: this.options.hiddenStyle });
-    },
-
-    // sets visible style on new atoms
-    _revealAppended : function( $newAtoms, callback ) {
-      var instance = this;
-      // apply visible style after a sec
-      setTimeout( function() {
-        // enable animation
-        $newAtoms.removeClass('no-transition');
-        // reveal newly inserted filtered elements
-        instance.styleQueue.push({ $el: $newAtoms, style: instance.options.visibleStyle });
-        instance._isInserting = false;
-        instance._processStyleQueue( $newAtoms, callback );
-      }, 10 );
-    },
-
-    // gathers all atoms
-    reloadItems : function() {
-      this.$allAtoms = this._getAtoms( this.element.children() );
-    },
-
-    // removes elements from Isotope widget
-    remove: function( $content, callback ) {
-      // remove elements immediately from Isotope instance
-      this.$allAtoms = this.$allAtoms.not( $content );
-      this.$filteredAtoms = this.$filteredAtoms.not( $content );
-      // remove() as a callback, for after transition / animation
-      var instance = this;
-      var removeContent = function() {
-        $content.remove();
-        if ( callback ) {
-          callback.call( instance.element );
-        }
-      };
-
-      if ( $content.filter( ':not(.' + this.options.hiddenClass + ')' ).length ) {
-        // if any non-hidden content needs to be removed
-        this.styleQueue.push({ $el: $content, style: this.options.hiddenStyle });
-        this._sort();
-        this.reLayout( removeContent );
+    Modernizr.prefixed      = function(prop, obj, elem){
+      if(!obj) {
+        return testPropsAll(prop, 'pfx');
       } else {
-        // remove it now
-        removeContent();
+        // Testing DOM property e.g. Modernizr.prefixed('requestAnimationFrame', window) // 'mozRequestAnimationFrame'
+        return testPropsAll(prop, obj, elem);
       }
+    };
+    /*>>prefixed*/
 
-    },
 
-    shuffle : function( callback ) {
-      this.updateSortData( this.$allAtoms );
-      this.options.sortBy = 'random';
-      this._sort();
-      this.reLayout( callback );
-    },
+    /*>>cssclasses*/
+    // Remove "no-js" class from <html> element, if it exists:
+    docElement.className = docElement.className.replace(/(^|\s)no-js(\s|$)/, '$1$2') +
 
-    // destroys widget, returns elements and container back (close) to original style
-    destroy : function() {
+                            // Add the new classes to the <html> element.
+                            (enableClasses ? ' js ' + classes.join(' ') : '');
+    /*>>cssclasses*/
 
-      var usingTransforms = this.usingTransforms;
-      var options = this.options;
+    return Modernizr;
 
-      this.$allAtoms
-        .removeClass( options.hiddenClass + ' ' + options.itemClass )
-        .each(function(){
-          var style = this.style;
-          style.position = '';
-          style.top = '';
-          style.left = '';
-          style.opacity = '';
-          if ( usingTransforms ) {
-            style[ transformProp ] = '';
-          }
-        });
-
-      // re-apply saved container styles
-      var elemStyle = this.element[0].style;
-      for ( var prop in this.originalStyle ) {
-        elemStyle[ prop ] = this.originalStyle[ prop ];
-      }
-
-      this.element
-        .unbind('.isotope')
-        .undelegate( '.' + options.hiddenClass, 'click' )
-        .removeClass( options.containerClass )
-        .removeData('isotope');
-
-      $window.unbind('.isotope');
-
-    },
-
-
-    // ====================== LAYOUTS ======================
-
-    // calculates number of rows or columns
-    // requires columnWidth or rowHeight to be set on namespaced object
-    // i.e. this.masonry.columnWidth = 200
-    _getSegments : function( isRows ) {
-      var namespace = this.options.layoutMode,
-          measure  = isRows ? 'rowHeight' : 'columnWidth',
-          size     = isRows ? 'height' : 'width',
-          segmentsName = isRows ? 'rows' : 'cols',
-          containerSize = this.element[ size ](),
-          segments,
-                    // i.e. options.masonry && options.masonry.columnWidth
-          segmentSize = this.options[ namespace ] && this.options[ namespace ][ measure ] ||
-                    // or use the size of the first item, i.e. outerWidth
-                    this.$filteredAtoms[ 'outer' + capitalize(size) ](true) ||
-                    // if there's no items, use size of container
-                    containerSize;
-
-      segments = Math.floor( containerSize / segmentSize );
-      segments = Math.max( segments, 1 );
-
-      // i.e. this.masonry.cols = ....
-      this[ namespace ][ segmentsName ] = segments;
-      // i.e. this.masonry.columnWidth = ...
-      this[ namespace ][ measure ] = segmentSize;
-
-    },
-
-    _checkIfSegmentsChanged : function( isRows ) {
-      var namespace = this.options.layoutMode,
-          segmentsName = isRows ? 'rows' : 'cols',
-          prevSegments = this[ namespace ][ segmentsName ];
-      // update cols/rows
-      this._getSegments( isRows );
-      // return if updated cols/rows is not equal to previous
-      return ( this[ namespace ][ segmentsName ] !== prevSegments );
-    },
-
-    // ====================== Masonry ======================
-
-    _masonryReset : function() {
-      // layout-specific props
-      this.masonry = {};
-      // FIXME shouldn't have to call this again
-      this._getSegments();
-      var i = this.masonry.cols;
-      this.masonry.colYs = [];
-      while (i--) {
-        this.masonry.colYs.push( 0 );
-      }
-    },
-
-    _masonryLayout : function( $elems ) {
-      var instance = this,
-          props = instance.masonry;
-      $elems.each(function(){
-        var $this  = $(this),
-            //how many columns does this brick span
-            colSpan = Math.ceil( $this.outerWidth(true) / props.columnWidth );
-        colSpan = Math.min( colSpan, props.cols );
-
-        if ( colSpan === 1 ) {
-          // if brick spans only one column, just like singleMode
-          instance._masonryPlaceBrick( $this, props.colYs );
-        } else {
-          // brick spans more than one column
-          // how many different places could this brick fit horizontally
-          var groupCount = props.cols + 1 - colSpan,
-              groupY = [],
-              groupColY,
-              i;
-
-          // for each group potential horizontal position
-          for ( i=0; i < groupCount; i++ ) {
-            // make an array of colY values for that one group
-            groupColY = props.colYs.slice( i, i+colSpan );
-            // and get the max value of the array
-            groupY[i] = Math.max.apply( Math, groupColY );
-          }
-
-          instance._masonryPlaceBrick( $this, groupY );
-        }
-      });
-    },
-
-    // worker method that places brick in the columnSet
-    //   with the the minY
-    _masonryPlaceBrick : function( $brick, setY ) {
-      // get the minimum Y value from the columns
-      var minimumY = Math.min.apply( Math, setY ),
-          shortCol = 0;
-
-      // Find index of short column, the first from the left
-      for (var i=0, len = setY.length; i < len; i++) {
-        if ( setY[i] === minimumY ) {
-          shortCol = i;
-          break;
-        }
-      }
-
-      // position the brick
-      var x = this.masonry.columnWidth * shortCol,
-          y = minimumY;
-      this._pushPosition( $brick, x, y );
-
-      // apply setHeight to necessary columns
-      var setHeight = minimumY + $brick.outerHeight(true),
-          setSpan = this.masonry.cols + 1 - len;
-      for ( i=0; i < setSpan; i++ ) {
-        this.masonry.colYs[ shortCol + i ] = setHeight;
-      }
-
-    },
-
-    _masonryGetContainerSize : function() {
-      var containerHeight = Math.max.apply( Math, this.masonry.colYs );
-      return { height: containerHeight };
-    },
-
-    _masonryResizeChanged : function() {
-      return this._checkIfSegmentsChanged();
-    },
-
-    // ====================== fitRows ======================
-
-    _fitRowsReset : function() {
-      this.fitRows = {
-        x : 0,
-        y : 0,
-        height : 0
-      };
-    },
-
-    _fitRowsLayout : function( $elems ) {
-      var instance = this,
-          containerWidth = this.element.width(),
-          props = this.fitRows;
-
-      $elems.each( function() {
-        var $this = $(this),
-            atomW = $this.outerWidth(true),
-            atomH = $this.outerHeight(true);
-
-        if ( props.x !== 0 && atomW + props.x > containerWidth ) {
-          // if this element cannot fit in the current row
-          props.x = 0;
-          props.y = props.height;
-        }
-
-        // position the atom
-        instance._pushPosition( $this, props.x, props.y );
-
-        props.height = Math.max( props.y + atomH, props.height );
-        props.x += atomW;
-
-      });
-    },
-
-    _fitRowsGetContainerSize : function () {
-      return { height : this.fitRows.height };
-    },
-
-    _fitRowsResizeChanged : function() {
-      return true;
-    },
-
-
-    // ====================== cellsByRow ======================
-
-    _cellsByRowReset : function() {
-      this.cellsByRow = {
-        index : 0
-      };
-      // get this.cellsByRow.columnWidth
-      this._getSegments();
-      // get this.cellsByRow.rowHeight
-      this._getSegments(true);
-    },
-
-    _cellsByRowLayout : function( $elems ) {
-      var instance = this,
-          props = this.cellsByRow;
-      $elems.each( function(){
-        var $this = $(this),
-            col = props.index % props.cols,
-            row = Math.floor( props.index / props.cols ),
-            x = ( col + 0.5 ) * props.columnWidth - $this.outerWidth(true) / 2,
-            y = ( row + 0.5 ) * props.rowHeight - $this.outerHeight(true) / 2;
-        instance._pushPosition( $this, x, y );
-        props.index ++;
-      });
-    },
-
-    _cellsByRowGetContainerSize : function() {
-      return { height : Math.ceil( this.$filteredAtoms.length / this.cellsByRow.cols ) * this.cellsByRow.rowHeight + this.offset.top };
-    },
-
-    _cellsByRowResizeChanged : function() {
-      return this._checkIfSegmentsChanged();
-    },
-
-
-    // ====================== straightDown ======================
-
-    _straightDownReset : function() {
-      this.straightDown = {
-        y : 0
-      };
-    },
-
-    _straightDownLayout : function( $elems ) {
-      var instance = this;
-      $elems.each( function( i ){
-        var $this = $(this);
-        instance._pushPosition( $this, 0, instance.straightDown.y );
-        instance.straightDown.y += $this.outerHeight(true);
-      });
-    },
-
-    _straightDownGetContainerSize : function() {
-      return { height : this.straightDown.y };
-    },
-
-    _straightDownResizeChanged : function() {
-      return true;
-    },
-
-
-    // ====================== masonryHorizontal ======================
-
-    _masonryHorizontalReset : function() {
-      // layout-specific props
-      this.masonryHorizontal = {};
-      // FIXME shouldn't have to call this again
-      this._getSegments( true );
-      var i = this.masonryHorizontal.rows;
-      this.masonryHorizontal.rowXs = [];
-      while (i--) {
-        this.masonryHorizontal.rowXs.push( 0 );
-      }
-    },
-
-    _masonryHorizontalLayout : function( $elems ) {
-      var instance = this,
-          props = instance.masonryHorizontal;
-      $elems.each(function(){
-        var $this  = $(this),
-            //how many rows does this brick span
-            rowSpan = Math.ceil( $this.outerHeight(true) / props.rowHeight );
-        rowSpan = Math.min( rowSpan, props.rows );
-
-        if ( rowSpan === 1 ) {
-          // if brick spans only one column, just like singleMode
-          instance._masonryHorizontalPlaceBrick( $this, props.rowXs );
-        } else {
-          // brick spans more than one row
-          // how many different places could this brick fit horizontally
-          var groupCount = props.rows + 1 - rowSpan,
-              groupX = [],
-              groupRowX, i;
-
-          // for each group potential horizontal position
-          for ( i=0; i < groupCount; i++ ) {
-            // make an array of colY values for that one group
-            groupRowX = props.rowXs.slice( i, i+rowSpan );
-            // and get the max value of the array
-            groupX[i] = Math.max.apply( Math, groupRowX );
-          }
-
-          instance._masonryHorizontalPlaceBrick( $this, groupX );
-        }
-      });
-    },
-
-    _masonryHorizontalPlaceBrick : function( $brick, setX ) {
-      // get the minimum Y value from the columns
-      var minimumX  = Math.min.apply( Math, setX ),
-          smallRow  = 0;
-      // Find index of smallest row, the first from the top
-      for (var i=0, len = setX.length; i < len; i++) {
-        if ( setX[i] === minimumX ) {
-          smallRow = i;
-          break;
-        }
-      }
-
-      // position the brick
-      var x = minimumX,
-          y = this.masonryHorizontal.rowHeight * smallRow;
-      this._pushPosition( $brick, x, y );
-
-      // apply setHeight to necessary columns
-      var setWidth = minimumX + $brick.outerWidth(true),
-          setSpan = this.masonryHorizontal.rows + 1 - len;
-      for ( i=0; i < setSpan; i++ ) {
-        this.masonryHorizontal.rowXs[ smallRow + i ] = setWidth;
-      }
-    },
-
-    _masonryHorizontalGetContainerSize : function() {
-      var containerWidth = Math.max.apply( Math, this.masonryHorizontal.rowXs );
-      return { width: containerWidth };
-    },
-
-    _masonryHorizontalResizeChanged : function() {
-      return this._checkIfSegmentsChanged(true);
-    },
-
-
-    // ====================== fitColumns ======================
-
-    _fitColumnsReset : function() {
-      this.fitColumns = {
-        x : 0,
-        y : 0,
-        width : 0
-      };
-    },
-
-    _fitColumnsLayout : function( $elems ) {
-      var instance = this,
-          containerHeight = this.element.height(),
-          props = this.fitColumns;
-      $elems.each( function() {
-        var $this = $(this),
-            atomW = $this.outerWidth(true),
-            atomH = $this.outerHeight(true);
-
-        if ( props.y !== 0 && atomH + props.y > containerHeight ) {
-          // if this element cannot fit in the current column
-          props.x = props.width;
-          props.y = 0;
-        }
-
-        // position the atom
-        instance._pushPosition( $this, props.x, props.y );
-
-        props.width = Math.max( props.x + atomW, props.width );
-        props.y += atomH;
-
-      });
-    },
-
-    _fitColumnsGetContainerSize : function () {
-      return { width : this.fitColumns.width };
-    },
-
-    _fitColumnsResizeChanged : function() {
-      return true;
-    },
-
-
-
-    // ====================== cellsByColumn ======================
-
-    _cellsByColumnReset : function() {
-      this.cellsByColumn = {
-        index : 0
-      };
-      // get this.cellsByColumn.columnWidth
-      this._getSegments();
-      // get this.cellsByColumn.rowHeight
-      this._getSegments(true);
-    },
-
-    _cellsByColumnLayout : function( $elems ) {
-      var instance = this,
-          props = this.cellsByColumn;
-      $elems.each( function(){
-        var $this = $(this),
-            col = Math.floor( props.index / props.rows ),
-            row = props.index % props.rows,
-            x = ( col + 0.5 ) * props.columnWidth - $this.outerWidth(true) / 2,
-            y = ( row + 0.5 ) * props.rowHeight - $this.outerHeight(true) / 2;
-        instance._pushPosition( $this, x, y );
-        props.index ++;
-      });
-    },
-
-    _cellsByColumnGetContainerSize : function() {
-      return { width : Math.ceil( this.$filteredAtoms.length / this.cellsByColumn.rows ) * this.cellsByColumn.columnWidth };
-    },
-
-    _cellsByColumnResizeChanged : function() {
-      return this._checkIfSegmentsChanged(true);
-    },
-
-    // ====================== straightAcross ======================
-
-    _straightAcrossReset : function() {
-      this.straightAcross = {
-        x : 0
-      };
-    },
-
-    _straightAcrossLayout : function( $elems ) {
-      var instance = this;
-      $elems.each( function( i ){
-        var $this = $(this);
-        instance._pushPosition( $this, instance.straightAcross.x, 0 );
-        instance.straightAcross.x += $this.outerWidth(true);
-      });
-    },
-
-    _straightAcrossGetContainerSize : function() {
-      return { width : this.straightAcross.x };
-    },
-
-    _straightAcrossResizeChanged : function() {
-      return true;
-    }
-
-  };
-
-
-  // ======================= imagesLoaded Plugin ===============================
-  /*!
-   * jQuery imagesLoaded plugin v1.1.0
-   * http://github.com/desandro/imagesloaded
-   *
-   * MIT License. by Paul Irish et al.
-   */
-
-
-  // $('#my-container').imagesLoaded(myFunction)
-  // or
-  // $('img').imagesLoaded(myFunction)
-
-  // execute a callback when all images have loaded.
-  // needed because .load() doesn't work on cached images
-
-  // callback function gets image collection as argument
-  //  `this` is the container
-
-  $.fn.imagesLoaded = function( callback ) {
-    var $this = this,
-        $images = $this.find('img').add( $this.filter('img') ),
-        len = $images.length,
-        blank = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==',
-        loaded = [];
-
-    function triggerCallback() {
-      callback.call( $this, $images );
-    }
-
-    function imgLoaded( event ) {
-      var img = event.target;
-      if ( img.src !== blank && $.inArray( img, loaded ) === -1 ){
-        loaded.push( img );
-        if ( --len <= 0 ){
-          setTimeout( triggerCallback );
-          $images.unbind( '.imagesLoaded', imgLoaded );
-        }
-      }
-    }
-
-    // if no images, trigger immediately
-    if ( !len ) {
-      triggerCallback();
-    }
-
-    $images.bind( 'load.imagesLoaded error.imagesLoaded',  imgLoaded ).each( function() {
-      // cached images don't fire load sometimes, so we reset src.
-      var src = this.src;
-      // webkit hack from http://groups.google.com/group/jquery-dev/browse_thread/thread/eee6ab7b2da50e1f
-      // data uri bypasses webkit log warning (thx doug jones)
-      this.src = blank;
-      this.src = src;
-    });
-
-    return $this;
-  };
-
-
-  // helper function for logging errors
-  // $.error breaks jQuery chaining
-  var logError = function( message ) {
-    if ( window.console ) {
-      window.console.error( message );
-    }
-  };
-
-  // =======================  Plugin bridge  ===============================
-  // leverages data method to either create or return $.Isotope constructor
-  // A bit from jQuery UI
-  //   https://github.com/jquery/jquery-ui/blob/master/ui/jquery.ui.widget.js
-  // A bit from jcarousel
-  //   https://github.com/jsor/jcarousel/blob/master/lib/jquery.jcarousel.js
-
-  $.fn.isotope = function( options, callback ) {
-    if ( typeof options === 'string' ) {
-      // call method
-      var args = Array.prototype.slice.call( arguments, 1 );
-
-      this.each(function(){
-        var instance = $.data( this, 'isotope' );
-        if ( !instance ) {
-          logError( "cannot call methods on isotope prior to initialization; " +
-              "attempted to call method '" + options + "'" );
-          return;
-        }
-        if ( !$.isFunction( instance[options] ) || options.charAt(0) === "_" ) {
-          logError( "no such method '" + options + "' for isotope instance" );
-          return;
-        }
-        // apply method
-        instance[ options ].apply( instance, args );
-      });
-    } else {
-      this.each(function() {
-        var instance = $.data( this, 'isotope' );
-        if ( instance ) {
-          // apply options & init
-          instance.option( options );
-          instance._init( callback );
-        } else {
-          // initialize new instance
-          $.data( this, 'isotope', new $.Isotope( options, this, callback ) );
-        }
-      });
-    }
-    // return jQuery object
-    // so plugin methods do not have to
-    return this;
-  };
-
-})( window, jQuery );
-/*!
-	Colorbox v1.5.9 - 2014-04-25
-	jQuery lightbox and modal window plugin
-	(c) 2014 Jack Moore - http://www.jacklmoore.com/colorbox
-	license: http://www.opensource.org/licenses/mit-license.php
-*/
-(function ($, document, window) {
-	var
-	// Default settings object.
-	// See http://jacklmoore.com/colorbox for details.
-	defaults = {
-		// data sources
-		html: false,
-		photo: false,
-		iframe: false,
-		inline: false,
-
-		// behavior and appearance
-		transition: "elastic",
-		speed: 300,
-		fadeOut: 300,
-		width: false,
-		initialWidth: "600",
-		innerWidth: false,
-		maxWidth: false,
-		height: false,
-		initialHeight: "450",
-		innerHeight: false,
-		maxHeight: false,
-		scalePhotos: true,
-		scrolling: true,
-		opacity: 0.9,
-		preloading: true,
-		className: false,
-		overlayClose: true,
-		escKey: true,
-		arrowKey: true,
-		top: false,
-		bottom: false,
-		left: false,
-		right: false,
-		fixed: false,
-		data: undefined,
-		closeButton: true,
-		fastIframe: true,
-		open: false,
-		reposition: true,
-		loop: true,
-		slideshow: false,
-		slideshowAuto: true,
-		slideshowSpeed: 2500,
-		slideshowStart: "start slideshow",
-		slideshowStop: "stop slideshow",
-		photoRegex: /\.(gif|png|jp(e|g|eg)|bmp|ico|webp|jxr|svg)((#|\?).*)?$/i,
-
-		// alternate image paths for high-res displays
-		retinaImage: false,
-		retinaUrl: false,
-		retinaSuffix: '@2x.$1',
-
-		// internationalization
-		current: "image {current} of {total}",
-		previous: "previous",
-		next: "next",
-		close: "close",
-		xhrError: "This content failed to load.",
-		imgError: "This image failed to load.",
-
-		// accessbility
-		returnFocus: true,
-		trapFocus: true,
-
-		// callbacks
-		onOpen: false,
-		onLoad: false,
-		onComplete: false,
-		onCleanup: false,
-		onClosed: false,
-
-		rel: function() {
-			return this.rel;
-		},
-		href: function() {
-			// using this.href would give the absolute url, when the href may have been inteded as a selector (e.g. '#container')
-			return $(this).attr('href');
-		},
-		title: function() {
-			return this.title;
-		}
-	},
-
-
-	// Abstracting the HTML and event identifiers for easy rebranding
-	colorbox = 'colorbox',
-	prefix = 'cbox',
-	boxElement = prefix + 'Element',
-	
-	// Events
-	event_open = prefix + '_open',
-	event_load = prefix + '_load',
-	event_complete = prefix + '_complete',
-	event_cleanup = prefix + '_cleanup',
-	event_closed = prefix + '_closed',
-	event_purge = prefix + '_purge',
-
-	// Cached jQuery Object Variables
-	$overlay,
-	$box,
-	$wrap,
-	$content,
-	$topBorder,
-	$leftBorder,
-	$rightBorder,
-	$bottomBorder,
-	$related,
-	$window,
-	$loaded,
-	$loadingBay,
-	$loadingOverlay,
-	$title,
-	$current,
-	$slideshow,
-	$next,
-	$prev,
-	$close,
-	$groupControls,
-	$events = $('<a/>'), // $({}) would be prefered, but there is an issue with jQuery 1.4.2
-	
-	// Variables for cached values or use across multiple functions
-	settings,
-	interfaceHeight,
-	interfaceWidth,
-	loadedHeight,
-	loadedWidth,
-	index,
-	photo,
-	open,
-	active,
-	closing,
-	loadingTimer,
-	publicMethod,
-	div = "div",
-	requests = 0,
-	previousCSS = {},
-	init;
-
-	// ****************
-	// HELPER FUNCTIONS
-	// ****************
-	
-	// Convenience function for creating new jQuery objects
-	function $tag(tag, id, css) {
-		var element = document.createElement(tag);
-
-		if (id) {
-			element.id = prefix + id;
-		}
-
-		if (css) {
-			element.style.cssText = css;
-		}
-
-		return $(element);
-	}
-	
-	// Get the window height using innerHeight when available to avoid an issue with iOS
-	// http://bugs.jquery.com/ticket/6724
-	function winheight() {
-		return window.innerHeight ? window.innerHeight : $(window).height();
-	}
-
-	function Settings(element, options) {
-		if (options !== Object(options)) {
-			options = {};
-		}
-
-		this.cache = {};
-		this.el = element;
-
-		this.value = function(key) {
-			var dataAttr;
-
-			if (this.cache[key] === undefined) {
-				dataAttr = $(this.el).attr('data-cbox-'+key);
-
-				if (dataAttr !== undefined) {
-					this.cache[key] = dataAttr;
-				} else if (options[key] !== undefined) {
-					this.cache[key] = options[key];
-				} else if (defaults[key] !== undefined) {
-					this.cache[key] = defaults[key];
-				}
-			}
-
-			return this.cache[key];
-		};
-
-		this.get = function(key) {
-			var value = this.value(key);
-			return $.isFunction(value) ? value.call(this.el, this) : value;
-		};
-	}
-
-	// Determine the next and previous members in a group.
-	function getIndex(increment) {
-		var
-		max = $related.length,
-		newIndex = (index + increment) % max;
-		
-		return (newIndex < 0) ? max + newIndex : newIndex;
-	}
-
-	// Convert '%' and 'px' values to integers
-	function setSize(size, dimension) {
-		return Math.round((/%/.test(size) ? ((dimension === 'x' ? $window.width() : winheight()) / 100) : 1) * parseInt(size, 10));
-	}
-	
-	// Checks an href to see if it is a photo.
-	// There is a force photo option (photo: true) for hrefs that cannot be matched by the regex.
-	function isImage(settings, url) {
-		return settings.get('photo') || settings.get('photoRegex').test(url);
-	}
-
-	function retinaUrl(settings, url) {
-		return settings.get('retinaUrl') && window.devicePixelRatio > 1 ? url.replace(settings.get('photoRegex'), settings.get('retinaSuffix')) : url;
-	}
-
-	function trapFocus(e) {
-		if ('contains' in $box[0] && !$box[0].contains(e.target) && e.target !== $overlay[0]) {
-			e.stopPropagation();
-			$box.focus();
-		}
-	}
-
-	function setClass(str) {
-		if (setClass.str !== str) {
-			$box.add($overlay).removeClass(setClass.str).addClass(str);
-			setClass.str = str;
-		}
-	}
-
-	function getRelated(rel) {
-		index = 0;
-		
-		if (rel && rel !== false) {
-			$related = $('.' + boxElement).filter(function () {
-				var options = $.data(this, colorbox);
-				var settings = new Settings(this, options);
-				return (settings.get('rel') === rel);
-			});
-			index = $related.index(settings.el);
-			
-			// Check direct calls to Colorbox.
-			if (index === -1) {
-				$related = $related.add(settings.el);
-				index = $related.length - 1;
-			}
-		} else {
-			$related = $(settings.el);
-		}
-	}
-
-	function trigger(event) {
-		// for external use
-		$(document).trigger(event);
-		// for internal use
-		$events.triggerHandler(event);
-	}
-
-	var slideshow = (function(){
-		var active,
-			className = prefix + "Slideshow_",
-			click = "click." + prefix,
-			timeOut;
-
-		function clear () {
-			clearTimeout(timeOut);
-		}
-
-		function set() {
-			if (settings.get('loop') || $related[index + 1]) {
-				clear();
-				timeOut = setTimeout(publicMethod.next, settings.get('slideshowSpeed'));
-			}
-		}
-
-		function start() {
-			$slideshow
-				.html(settings.get('slideshowStop'))
-				.unbind(click)
-				.one(click, stop);
-
-			$events
-				.bind(event_complete, set)
-				.bind(event_load, clear);
-
-			$box.removeClass(className + "off").addClass(className + "on");
-		}
-
-		function stop() {
-			clear();
-			
-			$events
-				.unbind(event_complete, set)
-				.unbind(event_load, clear);
-
-			$slideshow
-				.html(settings.get('slideshowStart'))
-				.unbind(click)
-				.one(click, function () {
-					publicMethod.next();
-					start();
-				});
-
-			$box.removeClass(className + "on").addClass(className + "off");
-		}
-
-		function reset() {
-			active = false;
-			$slideshow.hide();
-			clear();
-			$events
-				.unbind(event_complete, set)
-				.unbind(event_load, clear);
-			$box.removeClass(className + "off " + className + "on");
-		}
-
-		return function(){
-			if (active) {
-				if (!settings.get('slideshow')) {
-					$events.unbind(event_cleanup, reset);
-					reset();
-				}
-			} else {
-				if (settings.get('slideshow') && $related[1]) {
-					active = true;
-					$events.one(event_cleanup, reset);
-					if (settings.get('slideshowAuto')) {
-						start();
-					} else {
-						stop();
-					}
-					$slideshow.show();
-				}
-			}
-		};
-
-	}());
-
-
-	function launch(element) {
-		var options;
-
-		if (!closing) {
-
-			options = $(element).data('colorbox');
-
-			settings = new Settings(element, options);
-			
-			getRelated(settings.get('rel'));
-
-			if (!open) {
-				open = active = true; // Prevents the page-change action from queuing up if the visitor holds down the left or right keys.
-
-				setClass(settings.get('className'));
-				
-				// Show colorbox so the sizes can be calculated in older versions of jQuery
-				$box.css({visibility:'hidden', display:'block', opacity:''});
-				
-				$loaded = $tag(div, 'LoadedContent', 'width:0; height:0; overflow:hidden; visibility:hidden');
-				$content.css({width:'', height:''}).append($loaded);
-
-				// Cache values needed for size calculations
-				interfaceHeight = $topBorder.height() + $bottomBorder.height() + $content.outerHeight(true) - $content.height();
-				interfaceWidth = $leftBorder.width() + $rightBorder.width() + $content.outerWidth(true) - $content.width();
-				loadedHeight = $loaded.outerHeight(true);
-				loadedWidth = $loaded.outerWidth(true);
-
-				// Opens inital empty Colorbox prior to content being loaded.
-				var initialWidth = setSize(settings.get('initialWidth'), 'x');
-				var initialHeight = setSize(settings.get('initialHeight'), 'y');
-				var maxWidth = settings.get('maxWidth');
-				var maxHeight = settings.get('maxHeight');
-
-				settings.w = (maxWidth !== false ? Math.min(initialWidth, setSize(maxWidth, 'x')) : initialWidth) - loadedWidth - interfaceWidth;
-				settings.h = (maxHeight !== false ? Math.min(initialHeight, setSize(maxHeight, 'y')) : initialHeight) - loadedHeight - interfaceHeight;
-
-				$loaded.css({width:'', height:settings.h});
-				publicMethod.position();
-
-				trigger(event_open);
-				settings.get('onOpen');
-
-				$groupControls.add($title).hide();
-
-				$box.focus();
-				
-				if (settings.get('trapFocus')) {
-					// Confine focus to the modal
-					// Uses event capturing that is not supported in IE8-
-					if (document.addEventListener) {
-
-						document.addEventListener('focus', trapFocus, true);
-						
-						$events.one(event_closed, function () {
-							document.removeEventListener('focus', trapFocus, true);
-						});
-					}
-				}
-
-				// Return focus on closing
-				if (settings.get('returnFocus')) {
-					$events.one(event_closed, function () {
-						$(settings.el).focus();
-					});
-				}
-			}
-
-			$overlay.css({
-				opacity: parseFloat(settings.get('opacity')) || '',
-				cursor: settings.get('overlayClose') ? 'pointer' : '',
-				visibility: 'visible'
-			}).show();
-			
-			if (settings.get('closeButton')) {
-				$close.html(settings.get('close')).appendTo($content);
-			} else {
-				$close.appendTo('<div/>'); // replace with .detach() when dropping jQuery < 1.4
-			}
-
-			load();
-		}
-	}
-
-	// Colorbox's markup needs to be added to the DOM prior to being called
-	// so that the browser will go ahead and load the CSS background images.
-	function appendHTML() {
-		if (!$box && document.body) {
-			init = false;
-			$window = $(window);
-			$box = $tag(div).attr({
-				id: colorbox,
-				'class': $.support.opacity === false ? prefix + 'IE' : '', // class for optional IE8 & lower targeted CSS.
-				role: 'dialog',
-				tabindex: '-1'
-			}).hide();
-			$overlay = $tag(div, "Overlay").hide();
-			$loadingOverlay = $([$tag(div, "LoadingOverlay")[0],$tag(div, "LoadingGraphic")[0]]);
-			$wrap = $tag(div, "Wrapper");
-			$content = $tag(div, "Content").append(
-				$title = $tag(div, "Title"),
-				$current = $tag(div, "Current"),
-				$prev = $('<button type="button"/>').attr({id:prefix+'Previous'}),
-				$next = $('<button type="button"/>').attr({id:prefix+'Next'}),
-				$slideshow = $tag('button', "Slideshow"),
-				$loadingOverlay
-			);
-
-			$close = $('<button type="button"/>').attr({id:prefix+'Close'});
-			
-			$wrap.append( // The 3x3 Grid that makes up Colorbox
-				$tag(div).append(
-					$tag(div, "TopLeft"),
-					$topBorder = $tag(div, "TopCenter"),
-					$tag(div, "TopRight")
-				),
-				$tag(div, false, 'clear:left').append(
-					$leftBorder = $tag(div, "MiddleLeft"),
-					$content,
-					$rightBorder = $tag(div, "MiddleRight")
-				),
-				$tag(div, false, 'clear:left').append(
-					$tag(div, "BottomLeft"),
-					$bottomBorder = $tag(div, "BottomCenter"),
-					$tag(div, "BottomRight")
-				)
-			).find('div div').css({'float': 'left'});
-			
-			$loadingBay = $tag(div, false, 'position:absolute; width:9999px; visibility:hidden; display:none; max-width:none;');
-			
-			$groupControls = $next.add($prev).add($current).add($slideshow);
-
-			$(document.body).append($overlay, $box.append($wrap, $loadingBay));
-		}
-	}
-
-	// Add Colorbox's event bindings
-	function addBindings() {
-		function clickHandler(e) {
-			// ignore non-left-mouse-clicks and clicks modified with ctrl / command, shift, or alt.
-			// See: http://jacklmoore.com/notes/click-events/
-			if (!(e.which > 1 || e.shiftKey || e.altKey || e.metaKey || e.ctrlKey)) {
-				e.preventDefault();
-				launch(this);
-			}
-		}
-
-		if ($box) {
-			if (!init) {
-				init = true;
-
-				// Anonymous functions here keep the public method from being cached, thereby allowing them to be redefined on the fly.
-				$next.click(function () {
-					publicMethod.next();
-				});
-				$prev.click(function () {
-					publicMethod.prev();
-				});
-				$close.click(function () {
-					publicMethod.close();
-				});
-				$overlay.click(function () {
-					if (settings.get('overlayClose')) {
-						publicMethod.close();
-					}
-				});
-				
-				// Key Bindings
-				$(document).bind('keydown.' + prefix, function (e) {
-					var key = e.keyCode;
-					if (open && settings.get('escKey') && key === 27) {
-						e.preventDefault();
-						publicMethod.close();
-					}
-					if (open && settings.get('arrowKey') && $related[1] && !e.altKey) {
-						if (key === 37) {
-							e.preventDefault();
-							$prev.click();
-						} else if (key === 39) {
-							e.preventDefault();
-							$next.click();
-						}
-					}
-				});
-
-				if ($.isFunction($.fn.on)) {
-					// For jQuery 1.7+
-					$(document).on('click.'+prefix, '.'+boxElement, clickHandler);
-				} else {
-					// For jQuery 1.3.x -> 1.6.x
-					// This code is never reached in jQuery 1.9, so do not contact me about 'live' being removed.
-					// This is not here for jQuery 1.9, it's here for legacy users.
-					$('.'+boxElement).live('click.'+prefix, clickHandler);
-				}
-			}
-			return true;
-		}
-		return false;
-	}
-
-	// Don't do anything if Colorbox already exists.
-	if ($.colorbox) {
-		return;
-	}
-
-	// Append the HTML when the DOM loads
-	$(appendHTML);
-
-
-	// ****************
-	// PUBLIC FUNCTIONS
-	// Usage format: $.colorbox.close();
-	// Usage from within an iframe: parent.jQuery.colorbox.close();
-	// ****************
-	
-	publicMethod = $.fn[colorbox] = $[colorbox] = function (options, callback) {
-		var settings;
-		var $obj = this;
-
-		options = options || {};
-
-		if ($.isFunction($obj)) { // assume a call to $.colorbox
-			$obj = $('<a/>');
-			options.open = true;
-		} else if (!$obj[0]) { // colorbox being applied to empty collection
-			return $obj;
-		}
-
-
-		if (!$obj[0]) { // colorbox being applied to empty collection
-			return $obj;
-		}
-		
-		appendHTML();
-
-		if (addBindings()) {
-
-			if (callback) {
-				options.onComplete = callback;
-			}
-
-			$obj.each(function () {
-				var old = $.data(this, colorbox) || {};
-				$.data(this, colorbox, $.extend(old, options));
-			}).addClass(boxElement);
-
-			settings = new Settings($obj[0], options);
-			
-			if (settings.get('open')) {
-				launch($obj[0]);
-			}
-		}
-		
-		return $obj;
-	};
-
-	publicMethod.position = function (speed, loadedCallback) {
-		var
-		css,
-		top = 0,
-		left = 0,
-		offset = $box.offset(),
-		scrollTop,
-		scrollLeft;
-		
-		$window.unbind('resize.' + prefix);
-
-		// remove the modal so that it doesn't influence the document width/height
-		$box.css({top: -9e4, left: -9e4});
-
-		scrollTop = $window.scrollTop();
-		scrollLeft = $window.scrollLeft();
-
-		if (settings.get('fixed')) {
-			offset.top -= scrollTop;
-			offset.left -= scrollLeft;
-			$box.css({position: 'fixed'});
-		} else {
-			top = scrollTop;
-			left = scrollLeft;
-			$box.css({position: 'absolute'});
-		}
-
-		// keeps the top and left positions within the browser's viewport.
-		if (settings.get('right') !== false) {
-			left += Math.max($window.width() - settings.w - loadedWidth - interfaceWidth - setSize(settings.get('right'), 'x'), 0);
-		} else if (settings.get('left') !== false) {
-			left += setSize(settings.get('left'), 'x');
-		} else {
-			left += Math.round(Math.max($window.width() - settings.w - loadedWidth - interfaceWidth, 0) / 2);
-		}
-		
-		if (settings.get('bottom') !== false) {
-			top += Math.max(winheight() - settings.h - loadedHeight - interfaceHeight - setSize(settings.get('bottom'), 'y'), 0);
-		} else if (settings.get('top') !== false) {
-			top += setSize(settings.get('top'), 'y');
-		} else {
-			top += Math.round(Math.max(winheight() - settings.h - loadedHeight - interfaceHeight, 0) / 2);
-		}
-
-		$box.css({top: offset.top, left: offset.left, visibility:'visible'});
-		
-		// this gives the wrapper plenty of breathing room so it's floated contents can move around smoothly,
-		// but it has to be shrank down around the size of div#colorbox when it's done.  If not,
-		// it can invoke an obscure IE bug when using iframes.
-		$wrap[0].style.width = $wrap[0].style.height = "9999px";
-		
-		function modalDimensions() {
-			$topBorder[0].style.width = $bottomBorder[0].style.width = $content[0].style.width = (parseInt($box[0].style.width,10) - interfaceWidth)+'px';
-			$content[0].style.height = $leftBorder[0].style.height = $rightBorder[0].style.height = (parseInt($box[0].style.height,10) - interfaceHeight)+'px';
-		}
-
-		css = {width: settings.w + loadedWidth + interfaceWidth, height: settings.h + loadedHeight + interfaceHeight, top: top, left: left};
-
-		// setting the speed to 0 if the content hasn't changed size or position
-		if (speed) {
-			var tempSpeed = 0;
-			$.each(css, function(i){
-				if (css[i] !== previousCSS[i]) {
-					tempSpeed = speed;
-					return;
-				}
-			});
-			speed = tempSpeed;
-		}
-
-		previousCSS = css;
-
-		if (!speed) {
-			$box.css(css);
-		}
-
-		$box.dequeue().animate(css, {
-			duration: speed || 0,
-			complete: function () {
-				modalDimensions();
-				
-				active = false;
-				
-				// shrink the wrapper down to exactly the size of colorbox to avoid a bug in IE's iframe implementation.
-				$wrap[0].style.width = (settings.w + loadedWidth + interfaceWidth) + "px";
-				$wrap[0].style.height = (settings.h + loadedHeight + interfaceHeight) + "px";
-				
-				if (settings.get('reposition')) {
-					setTimeout(function () {  // small delay before binding onresize due to an IE8 bug.
-						$window.bind('resize.' + prefix, publicMethod.position);
-					}, 1);
-				}
-
-				if (loadedCallback) {
-					loadedCallback();
-				}
-			},
-			step: modalDimensions
-		});
-	};
-
-	publicMethod.resize = function (options) {
-		var scrolltop;
-		
-		if (open) {
-			options = options || {};
-			
-			if (options.width) {
-				settings.w = setSize(options.width, 'x') - loadedWidth - interfaceWidth;
-			}
-
-			if (options.innerWidth) {
-				settings.w = setSize(options.innerWidth, 'x');
-			}
-
-			$loaded.css({width: settings.w});
-			
-			if (options.height) {
-				settings.h = setSize(options.height, 'y') - loadedHeight - interfaceHeight;
-			}
-
-			if (options.innerHeight) {
-				settings.h = setSize(options.innerHeight, 'y');
-			}
-
-			if (!options.innerHeight && !options.height) {
-				scrolltop = $loaded.scrollTop();
-				$loaded.css({height: "auto"});
-				settings.h = $loaded.height();
-			}
-
-			$loaded.css({height: settings.h});
-
-			if(scrolltop) {
-				$loaded.scrollTop(scrolltop);
-			}
-			
-			publicMethod.position(settings.get('transition') === "none" ? 0 : settings.get('speed'));
-		}
-	};
-
-	publicMethod.prep = function (object) {
-		if (!open) {
-			return;
-		}
-		
-		var callback, speed = settings.get('transition') === "none" ? 0 : settings.get('speed');
-
-		$loaded.remove();
-
-		$loaded = $tag(div, 'LoadedContent').append(object);
-		
-		function getWidth() {
-			settings.w = settings.w || $loaded.width();
-			settings.w = settings.mw && settings.mw < settings.w ? settings.mw : settings.w;
-			return settings.w;
-		}
-		function getHeight() {
-			settings.h = settings.h || $loaded.height();
-			settings.h = settings.mh && settings.mh < settings.h ? settings.mh : settings.h;
-			return settings.h;
-		}
-		
-		$loaded.hide()
-		.appendTo($loadingBay.show())// content has to be appended to the DOM for accurate size calculations.
-		.css({width: getWidth(), overflow: settings.get('scrolling') ? 'auto' : 'hidden'})
-		.css({height: getHeight()})// sets the height independently from the width in case the new width influences the value of height.
-		.prependTo($content);
-		
-		$loadingBay.hide();
-		
-		// floating the IMG removes the bottom line-height and fixed a problem where IE miscalculates the width of the parent element as 100% of the document width.
-		
-		$(photo).css({'float': 'none'});
-
-		setClass(settings.get('className'));
-
-		callback = function () {
-			var total = $related.length,
-				iframe,
-				complete;
-			
-			if (!open) {
-				return;
-			}
-			
-			function removeFilter() { // Needed for IE8 in versions of jQuery prior to 1.7.2
-				if ($.support.opacity === false) {
-					$box[0].style.removeAttribute('filter');
-				}
-			}
-			
-			complete = function () {
-				clearTimeout(loadingTimer);
-				$loadingOverlay.hide();
-				trigger(event_complete);
-				settings.get('onComplete');
-			};
-
-			
-			$title.html(settings.get('title')).show();
-			$loaded.show();
-			
-			if (total > 1) { // handle grouping
-				if (typeof settings.get('current') === "string") {
-					$current.html(settings.get('current').replace('{current}', index + 1).replace('{total}', total)).show();
-				}
-				
-				$next[(settings.get('loop') || index < total - 1) ? "show" : "hide"]().html(settings.get('next'));
-				$prev[(settings.get('loop') || index) ? "show" : "hide"]().html(settings.get('previous'));
-				
-				slideshow();
-				
-				// Preloads images within a rel group
-				if (settings.get('preloading')) {
-					$.each([getIndex(-1), getIndex(1)], function(){
-						var img,
-							i = $related[this],
-							settings = new Settings(i, $.data(i, colorbox)),
-							src = settings.get('href');
-
-						if (src && isImage(settings, src)) {
-							src = retinaUrl(settings, src);
-							img = document.createElement('img');
-							img.src = src;
-						}
-					});
-				}
-			} else {
-				$groupControls.hide();
-			}
-			
-			if (settings.get('iframe')) {
-				iframe = document.createElement('iframe');
-				
-				if ('frameBorder' in iframe) {
-					iframe.frameBorder = 0;
-				}
-				
-				if ('allowTransparency' in iframe) {
-					iframe.allowTransparency = "true";
-				}
-
-				if (!settings.get('scrolling')) {
-					iframe.scrolling = "no";
-				}
-				
-				$(iframe)
-					.attr({
-						src: settings.get('href'),
-						name: (new Date()).getTime(), // give the iframe a unique name to prevent caching
-						'class': prefix + 'Iframe',
-						allowFullScreen : true // allow HTML5 video to go fullscreen
-					})
-					.one('load', complete)
-					.appendTo($loaded);
-				
-				$events.one(event_purge, function () {
-					iframe.src = "//about:blank";
-				});
-
-				if (settings.get('fastIframe')) {
-					$(iframe).trigger('load');
-				}
-			} else {
-				complete();
-			}
-			
-			if (settings.get('transition') === 'fade') {
-				$box.fadeTo(speed, 1, removeFilter);
-			} else {
-				removeFilter();
-			}
-		};
-		
-		if (settings.get('transition') === 'fade') {
-			$box.fadeTo(speed, 0, function () {
-				publicMethod.position(0, callback);
-			});
-		} else {
-			publicMethod.position(speed, callback);
-		}
-	};
-
-	function load () {
-		var href, setResize, prep = publicMethod.prep, $inline, request = ++requests;
-		
-		active = true;
-		
-		photo = false;
-		
-		trigger(event_purge);
-		trigger(event_load);
-		settings.get('onLoad');
-		
-		settings.h = settings.get('height') ?
-				setSize(settings.get('height'), 'y') - loadedHeight - interfaceHeight :
-				settings.get('innerHeight') && setSize(settings.get('innerHeight'), 'y');
-		
-		settings.w = settings.get('width') ?
-				setSize(settings.get('width'), 'x') - loadedWidth - interfaceWidth :
-				settings.get('innerWidth') && setSize(settings.get('innerWidth'), 'x');
-		
-		// Sets the minimum dimensions for use in image scaling
-		settings.mw = settings.w;
-		settings.mh = settings.h;
-		
-		// Re-evaluate the minimum width and height based on maxWidth and maxHeight values.
-		// If the width or height exceed the maxWidth or maxHeight, use the maximum values instead.
-		if (settings.get('maxWidth')) {
-			settings.mw = setSize(settings.get('maxWidth'), 'x') - loadedWidth - interfaceWidth;
-			settings.mw = settings.w && settings.w < settings.mw ? settings.w : settings.mw;
-		}
-		if (settings.get('maxHeight')) {
-			settings.mh = setSize(settings.get('maxHeight'), 'y') - loadedHeight - interfaceHeight;
-			settings.mh = settings.h && settings.h < settings.mh ? settings.h : settings.mh;
-		}
-		
-		href = settings.get('href');
-		
-		loadingTimer = setTimeout(function () {
-			$loadingOverlay.show();
-		}, 100);
-		
-		if (settings.get('inline')) {
-			var $target = $(href);
-			// Inserts an empty placeholder where inline content is being pulled from.
-			// An event is bound to put inline content back when Colorbox closes or loads new content.
-			$inline = $('<div>').hide().insertBefore($target);
-
-			$events.one(event_purge, function () {
-				$inline.replaceWith($target);
-			});
-
-			prep($target);
-		} else if (settings.get('iframe')) {
-			// IFrame element won't be added to the DOM until it is ready to be displayed,
-			// to avoid problems with DOM-ready JS that might be trying to run in that iframe.
-			prep(" ");
-		} else if (settings.get('html')) {
-			prep(settings.get('html'));
-		} else if (isImage(settings, href)) {
-
-			href = retinaUrl(settings, href);
-
-			photo = new Image();
-
-			$(photo)
-			.addClass(prefix + 'Photo')
-			.bind('error',function () {
-				prep($tag(div, 'Error').html(settings.get('imgError')));
-			})
-			.one('load', function () {
-				if (request !== requests) {
-					return;
-				}
-
-				// A small pause because some browsers will occassionaly report a 
-				// img.width and img.height of zero immediately after the img.onload fires
-				setTimeout(function(){
-					var percent;
-
-					$.each(['alt', 'longdesc', 'aria-describedby'], function(i,val){
-						var attr = $(settings.el).attr(val) || $(settings.el).attr('data-'+val);
-						if (attr) {
-							photo.setAttribute(val, attr);
-						}
-					});
-
-					if (settings.get('retinaImage') && window.devicePixelRatio > 1) {
-						photo.height = photo.height / window.devicePixelRatio;
-						photo.width = photo.width / window.devicePixelRatio;
-					}
-
-					if (settings.get('scalePhotos')) {
-						setResize = function () {
-							photo.height -= photo.height * percent;
-							photo.width -= photo.width * percent;
-						};
-						if (settings.mw && photo.width > settings.mw) {
-							percent = (photo.width - settings.mw) / photo.width;
-							setResize();
-						}
-						if (settings.mh && photo.height > settings.mh) {
-							percent = (photo.height - settings.mh) / photo.height;
-							setResize();
-						}
-					}
-					
-					if (settings.h) {
-						photo.style.marginTop = Math.max(settings.mh - photo.height, 0) / 2 + 'px';
-					}
-					
-					if ($related[1] && (settings.get('loop') || $related[index + 1])) {
-						photo.style.cursor = 'pointer';
-						photo.onclick = function () {
-							publicMethod.next();
-						};
-					}
-
-					photo.style.width = photo.width + 'px';
-					photo.style.height = photo.height + 'px';
-					prep(photo);
-				}, 1);
-			});
-			
-			photo.src = href;
-
-		} else if (href) {
-			$loadingBay.load(href, settings.get('data'), function (data, status) {
-				if (request === requests) {
-					prep(status === 'error' ? $tag(div, 'Error').html(settings.get('xhrError')) : $(this).contents());
-				}
-			});
-		}
-	}
-		
-	// Navigates to the next page/image in a set.
-	publicMethod.next = function () {
-		if (!active && $related[1] && (settings.get('loop') || $related[index + 1])) {
-			index = getIndex(1);
-			launch($related[index]);
-		}
-	};
-	
-	publicMethod.prev = function () {
-		if (!active && $related[1] && (settings.get('loop') || index)) {
-			index = getIndex(-1);
-			launch($related[index]);
-		}
-	};
-
-	// Note: to use this within an iframe use the following format: parent.jQuery.colorbox.close();
-	publicMethod.close = function () {
-		if (open && !closing) {
-			
-			closing = true;
-			open = false;
-			trigger(event_cleanup);
-			settings.get('onCleanup');
-			$window.unbind('.' + prefix);
-			$overlay.fadeTo(settings.get('fadeOut') || 0, 0);
-			
-			$box.stop().fadeTo(settings.get('fadeOut') || 0, 0, function () {
-				$box.hide();
-				$overlay.hide();
-				trigger(event_purge);
-				$loaded.remove();
-				
-				setTimeout(function () {
-					closing = false;
-					trigger(event_closed);
-					settings.get('onClosed');
-				}, 1);
-			});
-		}
-	};
-
-	// Removes changes Colorbox made to the document, but does not remove the plugin.
-	publicMethod.remove = function () {
-		if (!$box) { return; }
-
-		$box.stop();
-		$.colorbox.close();
-		$box.stop().remove();
-		$overlay.remove();
-		closing = false;
-		$box = null;
-		$('.' + boxElement)
-			.removeData(colorbox)
-			.removeClass(boxElement);
-
-		$(document).unbind('click.'+prefix);
-	};
-
-	// A method for fetching the current element Colorbox is referencing.
-	// returns a jQuery object.
-	publicMethod.element = function () {
-		return $(settings.el);
-	};
-
-	publicMethod.settings = defaults;
-
-}(jQuery, document, window));
+})(this, this.document);
