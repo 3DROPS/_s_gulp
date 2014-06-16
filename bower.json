@@ -1,8 +1,11 @@
 {
   "name": "_s_gulp",
-  "private": true,
-  "dependencies": {
-    "modernizr": "~2.8.1",
-    "jquery": "~1.11.0"
-  }
+  "version": "0.0.0",
+  "homepage": "https://github.com/jonathanmoore/_s_gulp",
+  "authors": [
+    "Jonathan Moore <jonathan@stylehatch.co>"
+  ],
+  "description": "Forked version of _s WordPress theme with Gulp.js",
+  "license": "GPL",
+  "private": true
 }
