@@ -32,9 +32,9 @@ gulp.task('styles', function () {
   return gulp.src(paths.scss)
     .pipe($.rubySass({
       style: 'expanded',
-      precision: 10
+      precision: 10,
+      loadPath: ['bower_components']
     }))
-    .pipe($.autoprefixer('last 2 version', 'safari 5', 'ie 8', 'ie 9', 'opera 12.1', 'ios 6', 'android 4'))
     .pipe(gulp.dest(dest.css))
     .pipe($.size());
 });

@@ -1,0 +1,8 @@
+@import "normalize-scss/normalize";
+@import "bourbon/dist/bourbon";
+@import "neat/app/assets/stylesheets/neat";
+
+// Not sure why Neat doesn't have this
+// but lets add it here.
+*:before,
+*:after { @include box-sizing(border-box); }

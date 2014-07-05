@@ -9,6 +9,9 @@
   "license": "GPL",
   "private": true,
   "dependencies": {
-    "modernizr": "~2.8.2"
+    "modernizr": "~2.8.2",
+    "bourbon": "~4.0.2",
+    "neat": "~1.6.0",
+    "normalize-scss": "~3.0.1"
   }
 }
