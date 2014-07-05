@@ -10,11 +10,11 @@ var pjson = require('./package.json');
 
 // paths to resources
 var paths = {
-  scss: 'build/scss/style.scss',
-  scripts: 'build/js/**/*.js',
-  main: 'build/js/main.js',
+  scss: 'src/scss/style.scss',
+  scripts: 'src/js/**/*.js',
+  main: 'src/js/main.js',
   plugins: ['bower_components/modernizr/modernizr.js'],
-  images: 'build/images/**/*',
+  images: 'src/images/**/*',
   php: '**/*.php',
   css: '**/*.css',
   js: 'js/**/*.js'
