@@ -28,12 +28,26 @@ var dest = {
 }
 
 // process scss file
-gulp.task('styles', function () {
+// gulp.task('styles', function () {
+//   return gulp.src(paths.scss)
+//     .pipe($.rubySass({
+//       style: 'expanded',
+//       precision: 10,
+//       loadPath: ['bower_components']
+//     }))
+//     .pipe(gulp.dest(dest.css))
+//     .pipe($.size());
+// });
+
+// compass
+gulp.task('styles', function() {
   return gulp.src(paths.scss)
-    .pipe($.rubySass({
-      style: 'expanded',
-      precision: 10,
-      loadPath: ['bower_components']
+    .pipe($.compass({
+      css: '',
+      sass: 'src/scss',
+      image: 'src/images',
+      import_path: ['bower_components'],
+      bundle_exec: true
     }))
     .pipe(gulp.dest(dest.css))
     .pipe($.size());

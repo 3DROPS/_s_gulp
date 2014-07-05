@@ -4,3 +4,5 @@ dist
 build
 .sass-cache
 bower_components
+bin
+.bundle
