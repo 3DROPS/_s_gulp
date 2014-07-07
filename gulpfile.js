@@ -41,7 +41,7 @@ var dest = {
 
 // compass
 gulp.task('styles', function() {
-  return gulp.src(paths.scss)
+  return gulp.src(paths.scss, 'Gemfile', 'Gemfile.lock')
     .pipe($.compass({
       css: '',
       sass: 'src/scss',
